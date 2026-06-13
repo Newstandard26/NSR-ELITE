@@ -1,0 +1,24 @@
+{
+  "name": "NSR Canvassing",
+  "short_name": "NSR Canvass",
+  "description": "New Standard Restoration field canvassing & door-knocking",
+  "start_url": "/map",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#51C5F4",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

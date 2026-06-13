@@ -1,0 +1,160 @@
+// NSR Field Canvassing App — Prisma schema
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  REP
+}
+
+model User {
+  id           String                @id @default(cuid())
+  name         String
+  email        String                @unique
+  // Hashed password for NextAuth credentials login.
+  passwordHash String?
+  role         Role                  @default(REP)
+  acculynxId   String?
+  isActive     Boolean               @default(true)
+  // Manager-set targets for gamification.
+  dailyTarget  Int?
+  weeklyTarget Int?
+  leads        Lead[]
+  appointments Appointment[]
+  locations    RepLocation[]
+  territories  TerritoryAssignment[]
+  notes        Note[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+}
+
+model DispositionStatus {
+  id        String   @id @default(cuid())
+  label     String
+  color     String // hex e.g. "#51C5F4"
+  icon      String // emoji e.g. "🔵"
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  sortOrder Int
+  leads     Lead[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Territory {
+  id          String                @id @default(cuid())
+  name        String
+  geoJson     Json
+  color       String
+  status      String                @default("ACTIVE") // ACTIVE, COMPLETED, PENDING
+  assignments TerritoryAssignment[]
+  leads       Lead[]
+  createdAt   DateTime              @default(now())
+}
+
+model TerritoryAssignment {
+  id           String    @id @default(cuid())
+  territory    Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  territoryId  String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  assignedAt   DateTime  @default(now())
+  unassignedAt DateTime?
+
+  @@index([territoryId])
+  @@index([userId])
+}
+
+model Lead {
+  id                  String             @id @default(cuid())
+  address             String
+  city                String
+  state               String
+  zip                 String
+  lat                 Float
+  lng                 Float
+  ownerName           String?
+  phone               String?
+  email               String?
+  roofAge             Int?
+  insuranceCompany    String?
+  dispositionStatus   DispositionStatus? @relation(fields: [dispositionStatusId], references: [id])
+  dispositionStatusId String?
+  dispositionAt       DateTime?
+  notes               Note[]
+  photos              Photo[]
+  rep                 User?              @relation(fields: [repId], references: [id])
+  repId               String?
+  territory           Territory?         @relation(fields: [territoryId], references: [id])
+  territoryId         String?
+  acculynxJobId       String?
+  acculynxStatus      String?
+  appointments        Appointment[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([dispositionStatusId])
+  @@index([repId])
+  @@index([territoryId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  content   String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String
+  author    String
+  authorUser User?   @relation(fields: [authorUserId], references: [id])
+  authorUserId String?
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  url       String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId      String
+  rep         User     @relation(fields: [repId], references: [id])
+  repId       String
+  scheduledAt DateTime
+  type        String // INSPECTION, ESTIMATE, FOLLOWUP
+  notes       String?
+  status      String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  createdAt   DateTime @default(now())
+
+  @@index([repId])
+  @@index([leadId])
+  @@index([scheduledAt])
+}
+
+model RepLocation {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  lat       Float
+  lng       Float
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
+}

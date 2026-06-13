@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --nsr-black: #000000;
+  --nsr-white: #ffffff;
+  --nsr-blue: #51c5f4;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--nsr-black);
+  color: var(--nsr-white);
+  font-weight: 300; /* Mulish Light for body */
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-header {
+  font-weight: 600; /* Mulish SemiBold for headers */
+}
+
+/* Touch targets: minimum 44px for field use. */
+button,
+a[role="button"],
+.tap-target {
+  min-height: 44px;
+}
+
+/* Mapbox controls + popups tuned for the dark theme. */
+.mapboxgl-popup-content {
+  background: #18181b;
+  color: #fff;
+  border: 1px solid #27272a;
+  border-radius: 0.75rem;
+}
+.mapboxgl-ctrl-group {
+  background: #18181b;
+}
+
+/* Bottom-sheet drawer animation. */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: slide-up 0.18s ease-out;
+}
+
+/* Hide scrollbars on horizontal filter strips. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

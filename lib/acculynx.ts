@@ -1,0 +1,207 @@
+// AccuLynx CRM service layer.
+// ALL calls are server-side only — the API key is never exposed to the client.
+// API docs index: https://apidocs.acculynx.com/llms.txt
+
+const BASE_URL = process.env.ACCULYNX_BASE_URL || "https://api.acculynx.com/api/v2";
+
+// ---------- Types ----------
+
+export interface LeadPayload {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+}
+
+export interface AccuLynxJob {
+  id: string;
+  jobNumber?: string;
+  customerName?: string;
+  milestone?: string;
+  source?: string;
+  [key: string]: unknown;
+}
+
+export interface Financials {
+  approvedJobValue?: number;
+  [key: string]: unknown;
+}
+
+export interface AccuLynxUser {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  [key: string]: unknown;
+}
+
+export interface Milestone {
+  milestone: string;
+  date: string;
+  [key: string]: unknown;
+}
+
+export interface JobFilterParams {
+  dateFrom?: string;
+  dateTo?: string;
+  milestone?: string;
+  assignedRep?: string;
+}
+
+export type MilestoneName =
+  | "Lead"
+  | "Prospect"
+  | "Approved"
+  | "Completed"
+  | "Invoiced"
+  | "Closed"
+  | "Cancelled"
+  | "Dead";
+
+export class AccuLynxError extends Error {
+  constructor(public status: number, message: string, public body?: unknown) {
+    super(message);
+    this.name = "AccuLynxError";
+  }
+}
+
+export class AccuLynxService {
+  private apiKey: string;
+  private baseUrl: string;
+
+  constructor(apiKey = process.env.ACCULYNX_API_KEY, baseUrl = BASE_URL) {
+    if (!apiKey) {
+      // Surface a clear error rather than failing deep inside a fetch.
+      throw new AccuLynxError(500, "ACCULYNX_API_KEY is not configured");
+    }
+    this.apiKey = apiKey;
+    this.baseUrl = baseUrl;
+  }
+
+  private async request<T>(
+    path: string,
+    init: RequestInit = {},
+  ): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(init.headers || {}),
+      },
+      // Never cache CRM data.
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        body = await res.text().catch(() => undefined);
+      }
+      throw new AccuLynxError(res.status, `AccuLynx ${init.method || "GET"} ${path} failed`, body);
+    }
+
+    // Some endpoints (notes, status updates) return no body.
+    if (res.status === 204) return undefined as T;
+    const text = await res.text();
+    return (text ? JSON.parse(text) : undefined) as T;
+  }
+
+  /** POST /jobs — create a canvassing lead in AccuLynx. */
+  createLead(data: LeadPayload): Promise<AccuLynxJob> {
+    const payload = {
+      customerName: data.name,
+      jobType: "Lead",
+      source: "Canvassing App",
+      address: {
+        street: data.address,
+        city: data.city,
+        state: data.state,
+        zip: data.zip,
+      },
+      phone: data.phone ?? undefined,
+      email: data.email ?? undefined,
+      notes: data.notes ?? undefined,
+    };
+    return this.request<AccuLynxJob>("/jobs", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** GET /jobs/{id} */
+  getJob(jobId: string): Promise<AccuLynxJob> {
+    return this.request<AccuLynxJob>(`/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  /** GET /jobs/{id}/financials — key field: approvedJobValue */
+  getJobFinancials(jobId: string): Promise<Financials> {
+    return this.request<Financials>(`/jobs/${encodeURIComponent(jobId)}/financials`);
+  }
+
+  /** GET /jobs/{id}/representatives/sales-owner — returns a user; resolve via getUsers(). */
+  async getSalesOwner(jobId: string): Promise<AccuLynxUser> {
+    const owner = await this.request<{ userId?: string; id?: string } & AccuLynxUser>(
+      `/jobs/${encodeURIComponent(jobId)}/representatives/sales-owner`,
+    );
+    const userId = owner.userId || owner.id;
+    if (userId && !owner.fullName) {
+      const users = await this.getUsers();
+      const match = users.find((u) => u.id === userId);
+      if (match) return match;
+    }
+    return owner;
+  }
+
+  /** GET /jobs/{id}/milestone-history */
+  getMilestoneHistory(jobId: string): Promise<Milestone[]> {
+    return this.request<Milestone[]>(`/jobs/${encodeURIComponent(jobId)}/milestone-history`);
+  }
+
+  /** Update a job's milestone. */
+  updateJobStatus(jobId: string, milestone: MilestoneName): Promise<void> {
+    return this.request<void>(`/jobs/${encodeURIComponent(jobId)}/milestone`, {
+      method: "PUT",
+      body: JSON.stringify({ milestone }),
+    });
+  }
+
+  /** GET /users — resolve user IDs to names. */
+  getUsers(): Promise<AccuLynxUser[]> {
+    return this.request<AccuLynxUser[]>("/users");
+  }
+
+  /** GET /jobs with optional filters. */
+  listJobs(params: JobFilterParams = {}): Promise<AccuLynxJob[]> {
+    const qs = new URLSearchParams();
+    if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
+    if (params.dateTo) qs.set("dateTo", params.dateTo);
+    if (params.milestone) qs.set("milestone", params.milestone);
+    if (params.assignedRep) qs.set("assignedRep", params.assignedRep);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return this.request<AccuLynxJob[]>(`/jobs${suffix}`);
+  }
+
+  /** POST /jobs/{id}/notes */
+  addNote(jobId: string, note: string): Promise<void> {
+    return this.request<void>(`/jobs/${encodeURIComponent(jobId)}/notes`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    });
+  }
+}
+
+// Lazily-constructed shared instance for server routes.
+let _service: AccuLynxService | null = null;
+export function acculynx(): AccuLynxService {
+  if (!_service) _service = new AccuLynxService();
+  return _service;
+}

@@ -1,0 +1,230 @@
+"use client";
+
+import { useEffect, useRef, useState, useMemo } from "react";
+import mapboxgl from "mapbox-gl";
+import useSWR from "swr";
+import { LocateFixed, Flame, Filter } from "lucide-react";
+import { LeadCardDrawer } from "./LeadCardDrawer";
+import { MapFilterBar, type MapFilters } from "./MapFilterBar";
+import type { DispositionStatusDTO, LeadDTO } from "@/lib/types";
+
+// Mapbox satellite-streets, dark variant.
+const MAP_STYLE = "mapbox://styles/mapbox/satellite-streets-v12";
+// Roscoe, IL — NSR home base.
+const DEFAULT_CENTER: [number, number] = [-89.0937, 42.4111];
+
+export function MapView() {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+
+  const [selectedLead, setSelectedLead] = useState<string | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<MapFilters>({});
+
+  const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
+
+  // Build the leads query string from active filters.
+  const leadsQuery = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (filters.status) qs.set("status", filters.status);
+    if (filters.rep) qs.set("rep", filters.rep);
+    if (filters.territory) qs.set("territory", filters.territory);
+    if (filters.dateFrom) qs.set("dateFrom", filters.dateFrom);
+    if (filters.dateTo) qs.set("dateTo", filters.dateTo);
+    return qs.toString();
+  }, [filters]);
+
+  const { data: leads = [], mutate: refetchLeads } = useSWR<LeadDTO[]>(
+    `/api/leads${leadsQuery ? `?${leadsQuery}` : ""}`,
+  );
+
+  // --- Initialize map once ---
+  useEffect(() => {
+    if (mapRef.current || !mapContainer.current) return;
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    if (!token) {
+      console.error("NEXT_PUBLIC_MAPBOX_TOKEN is not set");
+      return;
+    }
+    mapboxgl.accessToken = token;
+    const map = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: MAP_STYLE,
+      center: DEFAULT_CENTER,
+      zoom: 13,
+      attributionControl: false,
+    });
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // --- Render lead pins whenever leads or dispositions change ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const renderMarkers = () => {
+      // Clear existing DOM markers.
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
+
+      for (const lead of leads) {
+        if (!lead.lat && !lead.lng) continue; // skip un-geocoded
+        const color = lead.dispositionStatus?.color || "#3B82F6";
+        const icon = lead.dispositionStatus?.icon || "🔵";
+
+        const el = document.createElement("button");
+        el.className = "nsr-pin";
+        el.style.cssText = `width:30px;height:30px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;background:${color};box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:pointer;`;
+        el.textContent = icon;
+        el.setAttribute("aria-label", lead.ownerName || lead.address);
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          setSelectedLead(lead.id);
+        });
+
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([lead.lng, lead.lat])
+          .addTo(map);
+        markersRef.current.push(marker);
+      }
+    };
+
+    if (map.isStyleLoaded()) renderMarkers();
+    else map.once("load", renderMarkers);
+  }, [leads]);
+
+  // --- Heatmap toggle ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const apply = () => {
+      const geojson = {
+        type: "FeatureCollection",
+        features: leads
+          .filter((l) => l.lat || l.lng)
+          .map((l) => ({
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [l.lng, l.lat] },
+            properties: {},
+          })),
+      };
+
+      if (map.getSource("knocks")) {
+        (map.getSource("knocks") as mapboxgl.GeoJSONSource).setData(geojson as never);
+      } else {
+        map.addSource("knocks", { type: "geojson", data: geojson as never });
+        map.addLayer({
+          id: "knock-heat",
+          type: "heatmap",
+          source: "knocks",
+          paint: {
+            "heatmap-radius": 30,
+            "heatmap-intensity": 1,
+            "heatmap-opacity": 0.7,
+          },
+        });
+      }
+      map.setLayoutProperty("knock-heat", "visibility", showHeatmap ? "visible" : "none");
+    };
+
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [showHeatmap, leads]);
+
+  // --- GPS: center on rep location ---
+  function showMyLocation() {
+    if (!navigator.geolocation) return alert("Geolocation not available");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const map = mapRef.current;
+        if (!map) return;
+        map.flyTo({ center: [longitude, latitude], zoom: 15 });
+        if (userMarkerRef.current) userMarkerRef.current.remove();
+        const el = document.createElement("div");
+        el.style.cssText =
+          "width:18px;height:18px;border-radius:50%;background:#51C5F4;border:3px solid #fff;box-shadow:0 0 0 6px rgba(81,197,244,.3);";
+        userMarkerRef.current = new mapboxgl.Marker({ element: el })
+          .setLngLat([longitude, latitude])
+          .addTo(map);
+
+        // Log the ping (best effort).
+        fetch("/api/reps/location", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: latitude, lng: longitude }),
+        }).catch(() => {});
+      },
+      () => alert("Could not get your location"),
+      { enableHighAccuracy: true },
+    );
+  }
+
+  return (
+    <div className="relative h-[calc(100vh-56px)] w-full sm:h-screen">
+      <div ref={mapContainer} className="absolute inset-0" />
+
+      {/* Top filter bar */}
+      <div className="absolute inset-x-0 top-0 z-10 p-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className="flex h-11 items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 text-sm backdrop-blur"
+          >
+            <Filter className="h-4 w-4" /> Filters
+          </button>
+          <span className="rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-2 text-xs text-zinc-300 backdrop-blur">
+            {leads.length} leads
+          </span>
+        </div>
+        {showFilters && (
+          <MapFilterBar
+            statuses={statuses}
+            filters={filters}
+            onChange={setFilters}
+            onClose={() => setShowFilters(false)}
+          />
+        )}
+      </div>
+
+      {/* Floating controls */}
+      <div className="absolute bottom-24 right-3 z-10 flex flex-col gap-2 sm:bottom-6">
+        <button
+          onClick={() => setShowHeatmap((v) => !v)}
+          aria-label="Toggle heatmap"
+          className={`flex h-11 w-11 items-center justify-center rounded-full border border-zinc-700 backdrop-blur ${
+            showHeatmap ? "bg-nsr-blue text-black" : "bg-zinc-900/90 text-white"
+          }`}
+        >
+          <Flame className="h-5 w-5" />
+        </button>
+        <button
+          onClick={showMyLocation}
+          aria-label="Show my location"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900/90 text-white backdrop-blur"
+        >
+          <LocateFixed className="h-5 w-5" />
+        </button>
+      </div>
+
+      {selectedLead && (
+        <LeadCardDrawer
+          leadId={selectedLead}
+          statuses={statuses}
+          onClose={() => setSelectedLead(null)}
+          onChanged={() => refetchLeads()}
+        />
+      )}
+    </div>
+  );
+}
