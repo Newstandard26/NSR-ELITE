@@ -1,6 +1,10 @@
-export { default } from "next-auth/middleware";
+import { withAuth } from "next-auth/middleware";
 
-// Protect app routes; NextAuth redirects unauthenticated users to /login.
+// Protect app routes; unauthenticated users are sent to our branded /login.
+export default withAuth({
+  pages: { signIn: "/login" },
+});
+
 export const config = {
   matcher: [
     "/map/:path*",
