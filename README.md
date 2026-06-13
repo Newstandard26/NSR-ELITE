@@ -67,13 +67,21 @@ by cron with `x-cron-secret`) refreshes milestone status, and
 **Implemented:** schema + seed, auth + role guards, AccuLynx service layer, full
 API surface (leads, dispositions, territories, appointments, reps, dashboard,
 leaderboard, sync, webhook), map dashboard with dynamic pins + filters + heatmap
-+ GPS, Lead Card drawer, disposition pin manager, CSV import, leads/appointments/
-leaderboard/dashboard/territories/profile/settings pages, PWA config, Dockerfile.
++ GPS, Lead Card drawer, disposition pin manager, CSV import, manual lead entry
+with **Google Places address autocomplete** (proxied server-side so the key
+stays private), leads/appointments/leaderboard/dashboard/territories/profile/
+settings pages, PWA config, Dockerfile.
 
 **Scaffolded / follow-up:** in-map Mapbox-Draw polygon drawing UI, manager
-rep-location live layer, Google Places autocomplete on manual entry, offline
-write queue, browser push for appointment reminders, PDF export, user CRUD UI.
-See inline `TODO`/notes.
+rep-location live layer, offline write queue, browser push for appointment
+reminders, PDF export, user CRUD UI. See inline `TODO`/notes.
+
+### Address autocomplete
+
+Manual lead entry (`Leads → Add Lead`) suggests real addresses as you type and
+auto-fills city/state/zip and map coordinates. It calls Google through our own
+`/api/places/*` routes, so only `GOOGLE_PLACES_API_KEY` (server-side) is needed —
+no browser-exposed key. Enable the **Places API** on that key in Google Cloud.
 
 ## Docker
 
