@@ -30,8 +30,10 @@ export function handleError(err: unknown): NextResponse {
     }
   }
   if (err instanceof AccuLynxError) {
+    // Log the full AccuLynx response so it shows in the server logs.
+    console.error("AccuLynx error", err.status, JSON.stringify(err.body));
     return NextResponse.json(
-      { error: err.message, acculynx: err.body },
+      { error: err.message, status: err.status, acculynx: err.body },
       { status: err.status >= 400 && err.status < 600 ? err.status : 502 },
     );
   }

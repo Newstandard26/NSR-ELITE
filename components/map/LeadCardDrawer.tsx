@@ -65,7 +65,17 @@ export function LeadCardDrawer({
     const res = await fetch(`/api/leads/${leadId}/acculynx`, { method: "POST" });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(err.error || "Failed to create AccuLynx lead");
+      const detail =
+        err.acculynx != null
+          ? typeof err.acculynx === "string"
+            ? err.acculynx
+            : JSON.stringify(err.acculynx, null, 2)
+          : "";
+      alert(
+        `${err.error || "Failed to create AccuLynx lead"}` +
+          `${err.status ? ` (HTTP ${err.status})` : ""}` +
+          `${detail ? `\n\nAccuLynx said:\n${detail}` : ""}`,
+      );
     }
     await mutate();
     onChanged();
