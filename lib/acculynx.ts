@@ -46,6 +46,12 @@ export interface Milestone {
   [key: string]: unknown;
 }
 
+export interface ContactType {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
+
 export interface JobFilterParams {
   dateFrom?: string;
   dateTo?: string;
@@ -81,6 +87,8 @@ function normalizePhone(raw?: string | null): string | null {
 export class AccuLynxService {
   private apiKey: string;
   private baseUrl: string;
+  // Cached resolved contact type id (per account; stable for the process).
+  private contactTypeId?: string;
 
   constructor(apiKey = process.env.ACCULYNX_API_KEY, baseUrl = BASE_URL) {
     if (!apiKey) {
@@ -138,14 +146,39 @@ export class AccuLynxService {
     return { ...job, contactId: contact.id };
   }
 
+  /** GET /contacts/contact-types — list the account's contact types. */
+  async getContactTypes(): Promise<ContactType[]> {
+    const res = await this.request<{ items?: ContactType[] }>(
+      "/contacts/contact-types?pageSize=100",
+    );
+    return res.items ?? [];
+  }
+
+  /** Resolve a usable contact type id, preferring "Customer", then the default. */
+  private async resolveContactTypeId(): Promise<string> {
+    if (this.contactTypeId) return this.contactTypeId;
+    const types = await this.getContactTypes();
+    if (types.length === 0) {
+      throw new AccuLynxError(500, "No AccuLynx contact types are configured for this account");
+    }
+    const chosen =
+      types.find((t) => /customer/i.test(t.name)) ||
+      types.find((t) => t.isDefault) ||
+      types[0];
+    this.contactTypeId = chosen.id;
+    return chosen.id;
+  }
+
   /** POST /contacts — create the homeowner contact. Returns the new contact id. */
   async createContact(data: LeadPayload): Promise<{ id: string }> {
     const name = (data.name || "").trim();
     const parts = name.split(/\s+/).filter(Boolean);
     const firstName = parts[0] || "Homeowner";
     const lastName = parts.slice(1).join(" ") || undefined;
+    const contactTypeId = await this.resolveContactTypeId();
 
     const body: Record<string, unknown> = {
+      contactTypeIds: [contactTypeId],
       firstName,
       ...(lastName ? { lastName } : {}),
       mailingAddress: {
