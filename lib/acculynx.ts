@@ -15,6 +15,14 @@ export interface LeadPayload {
   phone?: string | null;
   email?: string | null;
   notes?: string | null;
+  // Canvassing lead id, stored on the AccuLynx contact for traceability.
+  leadId?: string | null;
+}
+
+export interface LeadSource {
+  id: string;
+  name: string;
+  isDefault?: boolean;
 }
 
 export interface AccuLynxJob {
@@ -89,6 +97,8 @@ export class AccuLynxService {
   private baseUrl: string;
   // Cached resolved contact type id (per account; stable for the process).
   private contactTypeId?: string;
+  // Cached resolved lead source id.
+  private leadSourceId?: string;
 
   constructor(apiKey = process.env.ACCULYNX_API_KEY, baseUrl = BASE_URL) {
     if (!apiKey) {
@@ -138,12 +148,55 @@ export class AccuLynxService {
    */
   async createLead(data: LeadPayload): Promise<AccuLynxJob> {
     const contact = await this.createContact(data);
+    const leadSourceId = await this.resolveLeadSourceId();
+
+    // AccuLynx /jobs expects a nested contact reference, a job-site
+    // locationAddress (state as a 2-letter abbreviation), and a priority.
+    const jobBody: Record<string, unknown> = {
+      contact: { id: contact.id },
+      locationAddress: {
+        street1: data.address,
+        city: data.city,
+        state: data.state,
+        country: "US",
+        zipCode: data.zip,
+      },
+      priority: "Normal",
+    };
+    if (leadSourceId) jobBody.leadSource = { id: leadSourceId };
+    if (data.notes) jobBody.notes = data.notes;
+
     const job = await this.request<AccuLynxJob>("/jobs", {
       method: "POST",
-      body: JSON.stringify({ contactId: contact.id }),
+      body: JSON.stringify(jobBody),
     });
-    // Surface the contact id alongside the job for storage/debugging.
     return { ...job, contactId: contact.id };
+  }
+
+  /** GET /lead-sources — list the account's active lead sources. */
+  async getLeadSources(): Promise<LeadSource[]> {
+    const res = await this.request<{ items?: LeadSource[] } | LeadSource[]>(
+      "/lead-sources?pageSize=100",
+    );
+    return Array.isArray(res) ? res : res.items ?? [];
+  }
+
+  /** Resolve a lead source id, preferring "Canvassing", then the default. */
+  private async resolveLeadSourceId(): Promise<string | null> {
+    if (this.leadSourceId) return this.leadSourceId;
+    try {
+      const sources = await this.getLeadSources();
+      if (sources.length === 0) return null;
+      const chosen =
+        sources.find((s) => /canvass/i.test(s.name)) ||
+        sources.find((s) => s.isDefault) ||
+        sources[0];
+      this.leadSourceId = chosen.id;
+      return chosen.id;
+    } catch {
+      // Best effort — the job can still be created without a lead source.
+      return null;
+    }
   }
 
   /** GET /contacts/contact-types — list the account's contact types. */
@@ -196,6 +249,8 @@ export class AccuLynxService {
       body.emailAddresses = [{ address: data.email, type: "Personal", primary: true }];
     }
     if (data.notes) body.note = data.notes;
+    // Store the canvassing lead id on the AccuLynx contact for traceability.
+    if (data.leadId) body.crossReference = data.leadId;
 
     return this.request<{ id: string }>("/contacts", {
       method: "POST",

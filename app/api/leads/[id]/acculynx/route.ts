@@ -31,6 +31,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       phone: lead.phone,
       email: lead.email,
       notes: notesText,
+      leadId: lead.id,
     });
 
     // Find the "Converted" disposition to flip the lead automatically.
