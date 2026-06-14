@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { Prisma } from "@prisma/client";
 import { AuthError } from "@/lib/auth";
 import { AccuLynxError } from "@/lib/acculynx";
 
@@ -13,6 +14,20 @@ export function handleError(err: unknown): NextResponse {
       { error: "Validation failed", issues: err.flatten() },
       { status: 422 },
     );
+  }
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    // P2025: record not found (update/delete target missing).
+    if (err.code === "P2025") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    // P2002: unique constraint violation.
+    if (err.code === "P2002") {
+      return NextResponse.json({ error: "Already exists" }, { status: 409 });
+    }
+    // P2003: foreign key constraint (e.g. referencing a missing related row).
+    if (err.code === "P2003") {
+      return NextResponse.json({ error: "Invalid reference" }, { status: 422 });
+    }
   }
   if (err instanceof AccuLynxError) {
     return NextResponse.json(
