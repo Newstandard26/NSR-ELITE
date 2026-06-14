@@ -70,6 +70,14 @@ export class AccuLynxError extends Error {
   }
 }
 
+// AccuLynx requires exactly 10 digits. Strip formatting and a leading US "1".
+function normalizePhone(raw?: string | null): string | null {
+  if (!raw) return null;
+  let digits = raw.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+  return digits.length === 10 ? digits : null;
+}
+
 export class AccuLynxService {
   private apiKey: string;
   private baseUrl: string;
@@ -115,25 +123,50 @@ export class AccuLynxService {
     return (text ? JSON.parse(text) : undefined) as T;
   }
 
-  /** POST /jobs — create a canvassing lead in AccuLynx. */
-  createLead(data: LeadPayload): Promise<AccuLynxJob> {
-    const payload = {
-      customerName: data.name,
-      jobType: "Lead",
-      source: "Canvassing App",
-      address: {
-        street: data.address,
-        city: data.city,
-        state: data.state,
-        zip: data.zip,
-      },
-      phone: data.phone ?? undefined,
-      email: data.email ?? undefined,
-      notes: data.notes ?? undefined,
-    };
-    return this.request<AccuLynxJob>("/jobs", {
+  /**
+   * Create a canvassing lead in AccuLynx. AccuLynx V2 requires a two-step flow:
+   * 1) POST /contacts to create the homeowner contact, 2) POST /jobs with that
+   * contact's id.
+   */
+  async createLead(data: LeadPayload): Promise<AccuLynxJob> {
+    const contact = await this.createContact(data);
+    const job = await this.request<AccuLynxJob>("/jobs", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ contactId: contact.id }),
+    });
+    // Surface the contact id alongside the job for storage/debugging.
+    return { ...job, contactId: contact.id };
+  }
+
+  /** POST /contacts — create the homeowner contact. Returns the new contact id. */
+  async createContact(data: LeadPayload): Promise<{ id: string }> {
+    const name = (data.name || "").trim();
+    const parts = name.split(/\s+/).filter(Boolean);
+    const firstName = parts[0] || "Homeowner";
+    const lastName = parts.slice(1).join(" ") || undefined;
+
+    const body: Record<string, unknown> = {
+      firstName,
+      ...(lastName ? { lastName } : {}),
+      mailingAddress: {
+        street1: data.address,
+        city: data.city,
+        zipCode: data.zip,
+      },
+    };
+
+    // Phone must be exactly 10 digits per the AccuLynx schema.
+    const phone = normalizePhone(data.phone);
+    if (phone) body.phoneNumbers = [{ number: phone, type: "Mobile", primary: true }];
+
+    if (data.email) {
+      body.emailAddresses = [{ address: data.email, type: "Personal", primary: true }];
+    }
+    if (data.notes) body.note = data.notes;
+
+    return this.request<{ id: string }>("/contacts", {
+      method: "POST",
+      body: JSON.stringify(body),
     });
   }
 
