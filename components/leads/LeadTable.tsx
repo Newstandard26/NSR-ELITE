@@ -8,14 +8,17 @@ import { Button } from "@/components/ui/button";
 import { DispositionBadge } from "@/components/ui/badge";
 import { CsvImport } from "./CsvImport";
 import { LeadForm } from "./LeadForm";
-import type { LeadDTO } from "@/lib/types";
+import { LeadCardDrawer } from "@/components/map/LeadCardDrawer";
+import type { DispositionStatusDTO, LeadDTO } from "@/lib/types";
 
 // Secondary list view of leads with search/sort/filter.
 export function LeadTable() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const query = search ? `?search=${encodeURIComponent(search)}` : "";
   const { data: leads = [], mutate } = useSWR<LeadDTO[]>(`/api/leads${query}`);
+  const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4">
@@ -50,7 +53,11 @@ export function LeadTable() {
           </thead>
           <tbody>
             {leads.map((l) => (
-              <tr key={l.id} className="border-t border-zinc-800">
+              <tr
+                key={l.id}
+                onClick={() => setSelectedLead(l.id)}
+                className="cursor-pointer border-t border-zinc-800 transition-colors hover:bg-zinc-900"
+              >
                 <td className="p-3">{l.ownerName || "—"}</td>
                 <td className="p-3 text-zinc-400">
                   {l.address}, {l.city} {l.state}
@@ -81,6 +88,15 @@ export function LeadTable() {
           </tbody>
         </table>
       </div>
+
+      {selectedLead && (
+        <LeadCardDrawer
+          leadId={selectedLead}
+          statuses={statuses}
+          onClose={() => setSelectedLead(null)}
+          onChanged={() => mutate()}
+        />
+      )}
     </div>
   );
 }
