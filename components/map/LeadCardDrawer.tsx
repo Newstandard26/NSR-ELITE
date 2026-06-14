@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { X, MapPin, Phone, Mail, ExternalLink, Camera, Plus, CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea, Input } from "@/components/ui/input";
@@ -30,7 +32,7 @@ export function LeadCardDrawer({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [apptOpen, setApptOpen] = useState(false);
-  const [apptAt, setApptAt] = useState("");
+  const [apptAt, setApptAt] = useState<Date | null>(null);
   const [apptType, setApptType] = useState("INSPECTION");
 
   async function updateDisposition(dispositionStatusId: string) {
@@ -94,13 +96,13 @@ export function LeadCardDrawer({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         leadId,
-        scheduledAt: new Date(apptAt).toISOString(),
+        scheduledAt: apptAt.toISOString(),
         type: apptType,
         pushToAcculynx: !!lead?.acculynxJobId,
       }),
     });
     setApptOpen(false);
-    setApptAt("");
+    setApptAt(null);
     setBusy(null);
   }
 
@@ -189,7 +191,18 @@ export function LeadCardDrawer({
 
             {apptOpen && (
               <div className="space-y-2 rounded-xl border border-zinc-800 p-3">
-                <Input type="datetime-local" value={apptAt} onChange={(e) => setApptAt(e.target.value)} />
+                <DatePicker
+                  selected={apptAt}
+                  onChange={(d) => setApptAt(d)}
+                  showTimeSelect
+                  timeIntervals={15}
+                  dateFormat="EEE, MMM d, yyyy  h:mm aa"
+                  minDate={new Date()}
+                  placeholderText="Pick a date & time"
+                  popperPlacement="top-start"
+                  withPortal
+                  className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nsr-blue"
+                />
                 <select
                   value={apptType}
                   onChange={(e) => setApptType(e.target.value)}
