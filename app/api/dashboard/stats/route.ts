@@ -1,96 +1,118 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
-import { computeRepStats, startOfToday, startOfWeek } from "@/lib/stats";
 
-// GET /api/dashboard/stats — aggregate stats for the manager dashboard.
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+type Range = "today" | "week" | "month" | "all";
+
+function windowFor(range: Range): { start: Date; end: Date } {
+  const end = new Date();
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  if (range === "week") start.setDate(start.getDate() - start.getDay());
+  else if (range === "month") start.setDate(1);
+  else if (range === "all") start.setFullYear(2000);
+  return { start, end };
+}
+
+// GET /api/dashboard/stats?range=today|week|month|all
+export async function GET(req: Request) {
   try {
     await requireRole("MANAGER", "ADMIN");
-    const today = startOfToday();
-    const week = startOfWeek();
+    const range = (new URL(req.url).searchParams.get("range") as Range) || "week";
+    const { start, end } = windowFor(range);
+    const inWindow = { gte: start, lte: end };
 
-    const [
-      activeTerritories,
-      totalLeads,
-      knockedToday,
-      appointmentsToday,
-      acculynxThisWeek,
-      knockedThisWeek,
-    ] = await Promise.all([
+    const dispoWhere: Prisma.LeadWhereInput = { dispositionAt: inWindow };
+
+    const [activeTerritories, totalLeads, knocked, appointments, acculynx] = await Promise.all([
       prisma.territory.count({ where: { status: "ACTIVE" } }),
       prisma.lead.count(),
-      prisma.lead.count({ where: { dispositionAt: { gte: today } } }),
-      prisma.appointment.count({ where: { createdAt: { gte: today } } }),
-      prisma.lead.count({ where: { acculynxJobId: { not: null }, updatedAt: { gte: week } } }),
-      prisma.lead.count({ where: { dispositionAt: { gte: week } } }),
+      prisma.lead.count({ where: dispoWhere }),
+      prisma.appointment.count({ where: { scheduledAt: inWindow } }),
+      prisma.lead.count({ where: { acculynxJobId: { not: null }, updatedAt: inWindow } }),
     ]);
+    const conversionPct = knocked > 0 ? Math.round((acculynx / knocked) * 100) : 0;
 
-    const conversionPct =
-      knockedThisWeek > 0 ? Math.round((acculynxThisWeek / knockedThisWeek) * 100) : 0;
-
-    const repStats = await computeRepStats();
-
-    // Pipeline funnel: lead counts grouped by their disposition's pipeline stage.
+    // Pipeline + disposition breakdown for leads worked in the window.
     const byStatus = await prisma.lead.groupBy({
       by: ["dispositionStatusId"],
+      where: dispoWhere,
       _count: { _all: true },
     });
     const statuses = await prisma.dispositionStatus.findMany({
-      select: { id: true, pipelineStage: true, color: true },
+      select: { id: true, label: true, color: true, pipelineStage: true },
     });
-    const stageMap = new Map(statuses.map((s) => [s.id, s]));
+    const sMap = new Map(statuses.map((s) => [s.id, s]));
     const pipelineCounts: Record<string, { count: number; color: string }> = {};
-    for (const row of byStatus) {
-      const s = row.dispositionStatusId ? stageMap.get(row.dispositionStatusId) : undefined;
-      const stage = s?.pipelineStage || "Unstaged";
-      pipelineCounts[stage] = pipelineCounts[stage] || { count: 0, color: s?.color || "#6B7280" };
-      pipelineCounts[stage].count += row._count._all;
-    }
+    const byDisposition = byStatus
+      .map((row) => {
+        const s = row.dispositionStatusId ? sMap.get(row.dispositionStatusId) : undefined;
+        const stage = s?.pipelineStage || "Unstaged";
+        pipelineCounts[stage] = pipelineCounts[stage] || { count: 0, color: s?.color || "#6B7280" };
+        pipelineCounts[stage].count += row._count._all;
+        return { label: s?.label || "Unassigned", color: s?.color || "#6B7280", count: row._count._all };
+      })
+      .sort((a, b) => b.count - a.count);
     const pipeline = Object.entries(pipelineCounts)
       .map(([stage, v]) => ({ stage, count: v.count, color: v.color }))
       .sort((a, b) => b.count - a.count);
 
-    // Per-disposition breakdown for the donut.
-    const dispoList = await prisma.dispositionStatus.findMany({
-      select: { id: true, label: true, color: true },
-    });
-    const dispoMap = new Map(dispoList.map((d) => [d.id, d]));
-    const byDisposition = byStatus
-      .map((row) => {
-        const d = row.dispositionStatusId ? dispoMap.get(row.dispositionStatusId) : undefined;
-        return { label: d?.label || "Unassigned", color: d?.color || "#6B7280", count: row._count._all };
-      })
-      .sort((a, b) => b.count - a.count);
-
-    // Recent team activity.
+    // Recent activity within the window.
     const activityRows = await prisma.leadActivity.findMany({
+      where: { createdAt: inWindow },
       orderBy: { createdAt: "desc" },
       take: 20,
       include: { lead: { select: { ownerName: true, address: true } } },
     });
     const recentActivity = activityRows.map((a) => ({
-      id: a.id,
-      type: a.type,
-      description: a.description,
-      actor: a.actor,
-      createdAt: a.createdAt,
+      id: a.id, type: a.type, description: a.description, actor: a.actor, createdAt: a.createdAt,
       lead: a.lead?.ownerName || a.lead?.address || "",
     }));
 
+    // Rep performance within the window.
+    const repUsers = await prisma.user.findMany({
+      where: { role: { in: ["REP", "MANAGER"] }, isActive: true },
+      select: { id: true, name: true },
+    });
+    const reps = await Promise.all(
+      repUsers.map(async (r) => {
+        const [doors, appts, ax] = await Promise.all([
+          prisma.lead.count({ where: { repId: r.id, dispositionAt: inWindow } }),
+          prisma.appointment.count({ where: { repId: r.id, scheduledAt: inWindow } }),
+          prisma.lead.count({ where: { repId: r.id, acculynxJobId: { not: null }, updatedAt: inWindow } }),
+        ]);
+        return { repId: r.id, name: r.name, doors, appointmentsSet: appts, acculynxLeads: ax, conversionRate: doors > 0 ? Math.round((ax / doors) * 100) : 0 };
+      }),
+    );
+    reps.sort((a, b) => b.doors - a.doors);
+
+    // Live reps today (GPS pinged today).
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const liveRaw = await prisma.repLocation.findMany({
+      where: { timestamp: { gte: todayStart } },
+      orderBy: { timestamp: "desc" },
+      include: { user: { select: { id: true, name: true } } },
+    });
+    const seen = new Set<string>();
+    const liveReps: { id: string; name: string; lastSeen: Date }[] = [];
+    for (const l of liveRaw) {
+      if (seen.has(l.userId)) continue;
+      seen.add(l.userId);
+      liveReps.push({ id: l.userId, name: l.user.name, lastSeen: l.timestamp });
+    }
+
     return json({
-      cards: {
-        activeTerritories,
-        totalLeads,
-        knockedToday,
-        appointmentsToday,
-        acculynxThisWeek,
-        conversionPct,
-      },
-      reps: repStats,
+      range,
+      cards: { activeTerritories, totalLeads, knocked, appointments, acculynx, conversionPct },
+      reps,
       pipeline,
       byDisposition,
       recentActivity,
+      liveReps,
     });
   } catch (err) {
     return handleError(err);
