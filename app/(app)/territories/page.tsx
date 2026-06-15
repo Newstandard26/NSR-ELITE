@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
 import { Plus, Trash2 } from "lucide-react";
@@ -51,7 +52,7 @@ export default function TerritoriesPage() {
           <div key={t.id} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
             <div className="flex items-center gap-2">
               <span className="h-4 w-4 rounded-full" style={{ backgroundColor: t.color }} />
-              <h2 className="font-semibold">{t.name}</h2>
+              <Link href={`/territories/${t.id}`} className="font-semibold hover:text-nsr-blue">{t.name}</Link>
               <span className="ml-auto rounded bg-zinc-800 px-2 py-0.5 text-xs">{t.status}</span>
               {isManager && (
                 <button onClick={() => remove(t.id)} className="p-1 text-zinc-500 hover:text-red-400" aria-label="Delete">

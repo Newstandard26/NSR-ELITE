@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardLabel, CardTitle } from "@/components/ui/card";
 import type { RepStatsDTO } from "@/lib/types";
 
@@ -15,6 +16,7 @@ interface DashboardData {
   };
   reps: RepStatsDTO[];
   pipeline: { stage: string; count: number; color: string }[];
+  byDisposition: { label: string; count: number; color: string }[];
   recentActivity: { id: string; type: string; description: string; actor: string | null; createdAt: string; lead: string }[];
 }
 
@@ -43,6 +45,34 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Leads by disposition donut */}
+      {(data?.byDisposition?.length ?? 0) > 0 && (
+        <Card className="space-y-2">
+          <CardLabel>Leads by disposition</CardLabel>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="h-48 w-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={data!.byDisposition} dataKey="count" nameKey="label" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                    {data!.byDisposition.map((d) => <Cell key={d.label} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <ul className="space-y-1 text-sm">
+              {data!.byDisposition.map((d) => (
+                <li key={d.label} className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: d.color }} />
+                  <span className="text-zinc-300">{d.label}</span>
+                  <span className="text-zinc-500">{d.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+      )}
 
       {/* Pipeline funnel + recent activity */}
       <div className="grid gap-4 md:grid-cols-2">

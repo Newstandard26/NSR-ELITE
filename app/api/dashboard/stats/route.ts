@@ -51,6 +51,18 @@ export async function GET() {
       .map(([stage, v]) => ({ stage, count: v.count, color: v.color }))
       .sort((a, b) => b.count - a.count);
 
+    // Per-disposition breakdown for the donut.
+    const dispoList = await prisma.dispositionStatus.findMany({
+      select: { id: true, label: true, color: true },
+    });
+    const dispoMap = new Map(dispoList.map((d) => [d.id, d]));
+    const byDisposition = byStatus
+      .map((row) => {
+        const d = row.dispositionStatusId ? dispoMap.get(row.dispositionStatusId) : undefined;
+        return { label: d?.label || "Unassigned", color: d?.color || "#6B7280", count: row._count._all };
+      })
+      .sort((a, b) => b.count - a.count);
+
     // Recent team activity.
     const activityRows = await prisma.leadActivity.findMany({
       orderBy: { createdAt: "desc" },
@@ -77,6 +89,7 @@ export async function GET() {
       },
       reps: repStats,
       pipeline,
+      byDisposition,
       recentActivity,
     });
   } catch (err) {
