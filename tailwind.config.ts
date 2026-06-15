@@ -13,7 +13,8 @@ const config: Config = {
         nsr: {
           black: "#000000",
           white: "#FFFFFF",
-          blue: "#51C5F4",
+          // Brand color is overridable at runtime via the --nsr-blue CSS var.
+          blue: "var(--nsr-blue, #51C5F4)",
         },
       },
       fontFamily: {

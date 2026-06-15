@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import useSWR from "swr";
 import { Map, Users, Calendar, Trophy, LayoutDashboard, Landmark, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,14 +23,22 @@ const managerItems = [
 export function SideNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { data: branding } = useSWR<{ logoUrl?: string | null }>("/api/settings/branding");
   const role = session?.user?.role;
   const isManager = role === "MANAGER" || role === "ADMIN";
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col border-r border-zinc-800 bg-black p-3 sm:flex">
       <div className="mb-4 px-2">
-        <p className="text-lg font-semibold text-nsr-blue">NSR</p>
-        <p className="text-xs text-zinc-500">Canvassing</p>
+        {branding?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={branding.logoUrl} alt="Logo" className="max-h-10 w-auto object-contain" />
+        ) : (
+          <>
+            <p className="text-lg font-semibold text-nsr-blue">NSR</p>
+            <p className="text-xs text-zinc-500">Canvassing</p>
+          </>
+        )}
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {[...baseItems, ...(isManager ? managerItems : [])].map(({ href, label, icon: Icon }) => {

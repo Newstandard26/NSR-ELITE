@@ -171,6 +171,14 @@ model Appointment {
   @@index([scheduledAt])
 }
 
+// Singleton workspace/branding settings.
+model WorkspaceSettings {
+  id         String   @id @default("default")
+  brandColor String?
+  logoUrl    String?
+  updatedAt  DateTime @updatedAt
+}
+
 // Singleton integration settings (single-workspace for now).
 model IntegrationSettings {
   id                   String   @id @default("default")

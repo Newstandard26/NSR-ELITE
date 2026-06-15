@@ -21,6 +21,9 @@ export default async function SettingsLayout({ children }: { children: React.Rea
         <Link href="/settings/integrations/acculynx" className="rounded-lg px-3 py-1.5 hover:bg-zinc-800">
           AccuLynx
         </Link>
+        <Link href="/settings/branding" className="rounded-lg px-3 py-1.5 hover:bg-zinc-800">
+          Branding
+        </Link>
         {isAdmin && (
           <Link href="/settings/integrations" className="rounded-lg px-3 py-1.5 hover:bg-zinc-800">
             Integrations
