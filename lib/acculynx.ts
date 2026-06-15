@@ -340,7 +340,8 @@ export class AccuLynxService {
   /** GET /users — all AccuLynx users (paginated; AccuLynx uses pageStartIndex). */
   async getUsers(): Promise<AccuLynxUser[]> {
     const all: AccuLynxUser[] = [];
-    const pageSize = 100;
+    // AccuLynx caps the users page size at 50.
+    const pageSize = 50;
     let pageStartIndex = 0;
     // Safety cap to avoid runaway loops.
     for (let i = 0; i < 25; i++) {
