@@ -28,7 +28,9 @@ export async function POST(req: Request) {
         lng,
         dispositionStatusId: defaultStatus?.id,
         dispositionAt: defaultStatus ? new Date() : undefined,
-        repId: user.role === "REP" ? user.id : undefined,
+        // Auto-assign the knock to whoever logged it (rep, manager, or admin);
+        // managers can reassign afterward.
+        repId: user.id,
       },
       include: { dispositionStatus: true, rep: { select: { id: true, name: true } } },
     });
