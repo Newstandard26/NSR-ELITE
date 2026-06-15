@@ -180,6 +180,19 @@ model WorkspaceSettings {
   updatedAt  DateTime @updatedAt
 }
 
+// CSV import history.
+model ImportLog {
+  id         String   @id @default(cuid())
+  filename   String
+  total      Int
+  success    Int
+  errors     Int
+  importedBy String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // AccuLynx sync audit log (pushes out + webhooks in).
 model SyncLog {
   id           String   @id @default(cuid())

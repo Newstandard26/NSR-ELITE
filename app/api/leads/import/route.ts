@@ -1,85 +1,101 @@
-import Papa from "papaparse";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { geocodeAddress, composeAddress } from "@/lib/geocode";
 import { logActivity } from "@/lib/activity";
 
-interface CsvRow {
-  name?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  phone?: string;
-  email?: string;
-  notes?: string;
-  [key: string]: string | undefined;
-}
+const rowSchema = z.object({
+  ownerName: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  notes: z.string().optional(),
+});
 
-// POST /api/leads/import — bulk CSV import. Accepts multipart file or raw CSV text.
-// Geocodes each row; rows that fail geocoding still import (flagged, lat/lng = 0).
+const schema = z.object({
+  filename: z.string().optional(),
+  leads: z.array(rowSchema).min(1),
+  defaultDispositionId: z.string().optional(),
+  defaultRepId: z.string().optional(),
+  duplicateHandling: z.enum(["skip", "update"]).default("skip"),
+});
+
+// POST /api/leads/import — bulk import mapped rows (managers/admins).
 export async function POST(req: Request) {
   try {
     const user = await requireRole("MANAGER", "ADMIN");
+    const body = schema.parse(await req.json());
 
-    let csvText: string;
-    const contentType = req.headers.get("content-type") || "";
-    if (contentType.includes("multipart/form-data")) {
-      const form = await req.formData();
-      const file = form.get("file");
-      if (!(file instanceof File)) return json({ error: "No file provided" }, 400);
-      csvText = await file.text();
-    } else {
-      const body = (await req.json()) as { csv?: string };
-      if (!body.csv) return json({ error: "No csv provided" }, 400);
-      csvText = body.csv;
-    }
+    const defaultStatus = body.defaultDispositionId
+      ? { id: body.defaultDispositionId }
+      : await prisma.dispositionStatus.findFirst({ where: { isDefault: true }, select: { id: true } });
 
-    const parsed = Papa.parse<CsvRow>(csvText, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.trim().toLowerCase(),
-    });
+    const results = { imported: 0, updated: 0, skipped: 0, geocodeFailed: 0, errors: [] as string[] };
 
-    const defaultStatus = await prisma.dispositionStatus.findFirst({ where: { isDefault: true } });
-
-    const results = { imported: 0, geocodeFailed: 0, skipped: 0, errors: [] as string[] };
-
-    for (const row of parsed.data) {
+    for (const row of body.leads) {
       if (!row.address || !row.city || !row.state || !row.zip) {
         results.skipped++;
         continue;
       }
       try {
-        const g = await geocodeAddress(composeAddress(row as Required<CsvRow>));
+        // Duplicate detection by address + zip.
+        const existing = await prisma.lead.findFirst({
+          where: { address: row.address, zip: row.zip },
+        });
+        if (existing) {
+          if (body.duplicateHandling === "skip") {
+            results.skipped++;
+            continue;
+          }
+          await prisma.lead.update({
+            where: { id: existing.id },
+            data: {
+              ownerName: row.ownerName || existing.ownerName,
+              phone: row.phone || existing.phone,
+              email: row.email || existing.email,
+            },
+          });
+          results.updated++;
+          continue;
+        }
+
+        const g = await geocodeAddress(composeAddress(row as Required<typeof row>));
         if (!g.ok) results.geocodeFailed++;
         const lead = await prisma.lead.create({
           data: {
-            address: row.address,
-            city: row.city,
-            state: row.state,
-            zip: row.zip,
-            lat: g.lat,
-            lng: g.lng,
-            ownerName: row.name || undefined,
+            address: row.address, city: row.city, state: row.state, zip: row.zip,
+            lat: g.lat, lng: g.lng,
+            ownerName: row.ownerName || undefined,
             phone: row.phone || undefined,
             email: row.email || undefined,
+            repId: body.defaultRepId || undefined,
             dispositionStatusId: defaultStatus?.id,
             dispositionAt: defaultStatus ? new Date() : undefined,
           },
         });
         await logActivity(lead.id, "lead_imported", "Imported from CSV", user.name || "Import");
         if (row.notes) {
-          await prisma.note.create({
-            data: { leadId: lead.id, content: row.notes, author: user.name || "Import" },
-          });
+          await prisma.note.create({ data: { leadId: lead.id, content: row.notes, author: user.name || "Import" } });
         }
         results.imported++;
       } catch (e) {
         results.errors.push(`${row.address}: ${(e as Error).message}`);
       }
     }
+
+    await prisma.importLog.create({
+      data: {
+        filename: body.filename || "import.csv",
+        total: body.leads.length,
+        success: results.imported + results.updated,
+        errors: results.errors.length + results.skipped,
+        importedBy: user.name,
+      },
+    });
 
     return json(results);
   } catch (err) {

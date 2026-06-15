@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Plus, Download, Filter, ChevronUp, ChevronDown, Trash2, X, Settings2 } from "lucide-react";
+import { Plus, Download, Filter, ChevronUp, ChevronDown, Trash2, X, Settings2, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DispositionBadge } from "@/components/ui/badge";
-import { CsvImport } from "./CsvImport";
 import { LeadForm } from "./LeadForm";
 import type { DispositionStatusDTO, LeadDTO, RepStatsDTO } from "@/lib/types";
 
@@ -161,7 +161,9 @@ export function LeadTable() {
           <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
             <Plus className="h-4 w-4" /> Add Lead
           </Button>
-          <CsvImport onImported={() => mutate()} />
+          <Link href="/import" className="inline-flex h-9 items-center gap-2 rounded-xl bg-nsr-blue px-3 text-xs font-semibold text-black">
+            <Upload className="h-4 w-4" /> Import
+          </Link>
         </div>
       </div>
 
