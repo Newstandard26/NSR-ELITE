@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Check, Plus, KeyRound, X, Copy } from "lucide-react";
+import { Check, Plus, KeyRound, X, Copy, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -64,6 +64,17 @@ export function UsersManager() {
     });
     if (res.ok) setTempCred({ email: user.email, password });
     else alert("Failed to reset password");
+  }
+
+  async function remove(user: UserRow) {
+    if (!confirm(`Permanently delete ${user.name}? This can't be undone.`)) return;
+    const res = await fetch(`/api/users/${user.id}`, { method: "DELETE" });
+    if (res.ok) {
+      mutate();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "Failed to delete user");
+    }
   }
 
   return (
@@ -137,6 +148,9 @@ export function UsersManager() {
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => resetPassword(u)} title="Reset password" className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white">
                         <KeyRound className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => remove(u)} title="Delete user" className="rounded-lg p-2 text-zinc-400 hover:bg-red-950 hover:text-red-400">
+                        <Trash2 className="h-4 w-4" />
                       </button>
                       <Button size="sm" onClick={() => save(u)} disabled={!dirty || savingId === u.id}>
                         <Check className="h-3.5 w-3.5" />{savingId === u.id ? "Saving…" : "Save"}

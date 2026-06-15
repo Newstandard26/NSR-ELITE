@@ -2,7 +2,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireRole } from "@/lib/auth";
+import { requireRole, AuthError } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 
 const patchSchema = z.object({
@@ -39,6 +39,29 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
     });
     return json(user);
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+// DELETE /api/users/[id] — permanently remove a user (managers + admins).
+// Leads keep their history (rep is unassigned); a user with appointments is
+// blocked so booked work isn't silently destroyed — deactivate them instead.
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  try {
+    const me = await requireRole("MANAGER", "ADMIN");
+    if (me.id === params.id) {
+      throw new AuthError(400, "You can't delete your own account.");
+    }
+    const appointments = await prisma.appointment.count({ where: { repId: params.id } });
+    if (appointments > 0) {
+      throw new AuthError(
+        409,
+        `This user has ${appointments} appointment(s). Deactivate them instead to keep that history.`,
+      );
+    }
+    await prisma.user.delete({ where: { id: params.id } });
+    return json({ ok: true });
   } catch (err) {
     return handleError(err);
   }
