@@ -42,6 +42,7 @@ export async function GET(req: Request) {
         by: ["repId"],
         where: { createdAt: { gte: since } },
         _count: { _all: true },
+        _max: { createdAt: true },
       }),
       prisma.repLocation.groupBy({
         by: ["userId"],
@@ -53,32 +54,45 @@ export async function GET(req: Request) {
         by: ["authorUserId"],
         where: { createdAt: { gte: since }, authorUserId: { not: null } },
         _count: { _all: true },
+        _max: { createdAt: true },
       }),
       prisma.lead.groupBy({
         by: ["repId"],
         where: { updatedAt: { gte: since }, repId: { not: null } },
         _count: { _all: true },
+        _max: { updatedAt: true },
       }),
     ]);
 
     const loginMap = new Map(loginRows.map((r) => [r.userId, r]));
-    const apptMap = new Map(apptAgg.map((r) => [r.repId, r._count._all]));
+    const apptMap = new Map(apptAgg.map((r) => [r.repId, r]));
     const gpsMap = new Map(gpsAgg.map((r) => [r.userId, r]));
-    const noteMap = new Map(noteAgg.map((r) => [r.authorUserId as string, r._count._all]));
-    const leadMap = new Map(leadAgg.map((r) => [r.repId as string, r._count._all]));
+    const noteMap = new Map(noteAgg.map((r) => [r.authorUserId as string, r]));
+    const leadMap = new Map(leadAgg.map((r) => [r.repId as string, r]));
 
     const rows = users.map((u) => {
       const lg = loginMap.get(u.id);
       const gps = gpsMap.get(u.id);
+      const appt = apptMap.get(u.id);
+      const note = noteMap.get(u.id);
+      const lead = leadMap.get(u.id);
       const logins = lg ? Number(lg.logins) : 0;
       const activeDays = lg ? Number(lg.activeDays) : 0;
-      const appts = apptMap.get(u.id) ?? 0;
+      const appts = appt?._count._all ?? 0;
       const gpsPings = gps?._count._all ?? 0;
-      const notes = noteMap.get(u.id) ?? 0;
-      const leads = leadMap.get(u.id) ?? 0;
+      const notes = note?._count._all ?? 0;
+      const leads = lead?._count._all ?? 0;
 
-      // Last activity = the most recent of last login or last GPS ping.
-      const stamps = [u.lastLoginAt, gps?._max.timestamp].filter(Boolean) as Date[];
+      // Last activity = the most recent signal across login OR any in-app work.
+      // This keeps users who stay logged in (persistent mobile sessions) from
+      // looking inactive just because they didn't re-authenticate.
+      const stamps = [
+        u.lastLoginAt,
+        appt?._max.createdAt,
+        gps?._max.timestamp,
+        note?._max.createdAt,
+        lead?._max.updatedAt,
+      ].filter(Boolean) as Date[];
       const lastActiveAt = stamps.length
         ? new Date(Math.max(...stamps.map((d) => d.getTime())))
         : null;
@@ -106,7 +120,9 @@ export async function GET(req: Request) {
       totalUsers: rows.length,
       activeUsers: rows.filter((r) => r.isActive).length,
       engagedUsers: rows.filter((r) => r.engaged).length,
-      neverLoggedIn: rows.filter((r) => !r.lastLoginAt).length,
+      // Active accounts that did nothing trackable in the range — the people
+      // who actually aren't utilizing the app.
+      dormantUsers: rows.filter((r) => r.isActive && !r.engaged).length,
     };
 
     return json({ range, since: since.toISOString(), generatedAt: new Date().toISOString(), summary, rows });

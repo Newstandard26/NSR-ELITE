@@ -25,7 +25,7 @@ interface Summary {
   totalUsers: number;
   activeUsers: number;
   engagedUsers: number;
-  neverLoggedIn: number;
+  dormantUsers: number;
 }
 
 const RANGES = [
@@ -42,11 +42,13 @@ function fromNow(iso: string | null) {
   return formatDistanceToNow(new Date(iso), { addSuffix: true });
 }
 
-// Visual flag for adoption: green if seen in last 7 days, amber if stale,
-// red if they have never logged in.
+// Visual flag for adoption, based on the most recent activity of ANY kind
+// (login or in-app work) — not just logins, since persistent mobile sessions
+// mean an active user may not have re-authenticated recently.
 function statusFor(row: Row): { label: string; cls: string } {
-  if (!row.lastLoginAt) return { label: "Never logged in", cls: "bg-red-500/15 text-red-400" };
-  const days = (Date.now() - new Date(row.lastActiveAt ?? row.lastLoginAt).getTime()) / 86_400_000;
+  const ref = row.lastActiveAt ?? row.lastLoginAt;
+  if (!ref) return { label: "No activity", cls: "bg-red-500/15 text-red-400" };
+  const days = (Date.now() - new Date(ref).getTime()) / 86_400_000;
   if (days <= 7) return { label: "Active", cls: "bg-green-500/15 text-green-400" };
   if (days <= 30) return { label: "Slipping", cls: "bg-amber-500/15 text-amber-400" };
   return { label: "Inactive", cls: "bg-red-500/15 text-red-400" };
@@ -125,7 +127,7 @@ export function UserAnalytics() {
         <StatCard label="Total Users" value={summary?.totalUsers ?? "—"} />
         <StatCard label="Active Accounts" value={summary?.activeUsers ?? "—"} />
         <StatCard label="Used in Range" value={summary?.engagedUsers ?? "—"} hint="logged in or did work" />
-        <StatCard label="Never Logged In" value={summary?.neverLoggedIn ?? "—"} />
+        <StatCard label="Not Using" value={summary?.dormantUsers ?? "—"} hint="active accounts, no activity" />
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-zinc-800">
