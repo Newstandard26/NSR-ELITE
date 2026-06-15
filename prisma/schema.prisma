@@ -25,6 +25,8 @@ model User {
   role         Role                  @default(REP)
   acculynxId   String?
   isActive     Boolean               @default(true)
+  // Timestamp of the user's most recent successful login.
+  lastLoginAt  DateTime?
   // Manager-set targets for gamification.
   dailyTarget  Int?
   weeklyTarget Int?
@@ -34,6 +36,7 @@ model User {
   territories  TerritoryAssignment[]
   notes        Note[]
   notifications Notification[]
+  loginEvents  LoginEvent[]
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt
 }
@@ -231,6 +234,17 @@ model IntegrationSettings {
   // Map of AccuLynx milestone name -> disposition status id.
   milestoneMap         Json?
   updatedAt            DateTime @updatedAt
+}
+
+// One row per successful login, for usage/adoption analytics.
+model LoginEvent {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model RepLocation {
