@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "vercel-build": "prisma generate && prisma migrate deploy && (tsx prisma/seed.ts || echo 'seed skipped') && next build",
+    "vercel-build": "prisma generate && DATABASE_URL=${DATABASE_URL_UNPOOLED:-$DATABASE_URL} prisma migrate deploy && (tsx prisma/seed.ts || echo 'seed skipped') && next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
