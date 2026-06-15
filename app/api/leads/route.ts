@@ -41,16 +41,41 @@ export async function GET(req: Request) {
       ];
     }
 
-    const leads = await prisma.lead.findMany({
-      where,
-      orderBy: { updatedAt: "desc" },
-      include: {
-        dispositionStatus: true,
-        rep: { select: { id: true, name: true } },
-        territory: { select: { id: true, name: true } },
-        _count: { select: { notes: true, photos: true } },
-      },
-    });
+    // Sorting (whitelisted columns only).
+    const sortable: Record<string, true> = {
+      ownerName: true,
+      city: true,
+      createdAt: true,
+      updatedAt: true,
+      dispositionAt: true,
+    };
+    const sort = searchParams.get("sort") || "updatedAt";
+    const order = searchParams.get("order") === "asc" ? "asc" : "desc";
+    const orderBy: Prisma.LeadOrderByWithRelationInput = sortable[sort]
+      ? { [sort]: order }
+      : { updatedAt: "desc" };
+
+    const include = {
+      dispositionStatus: true,
+      rep: { select: { id: true, name: true } },
+      territory: { select: { id: true, name: true } },
+      _count: { select: { notes: true, photos: true } },
+    } as const;
+
+    // Paginated response when ?page= is present; plain array otherwise (the
+    // map relies on the array shape).
+    const pageParam = searchParams.get("page");
+    if (pageParam) {
+      const page = Math.max(1, parseInt(pageParam, 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25", 10)));
+      const [items, total] = await Promise.all([
+        prisma.lead.findMany({ where, orderBy, include, skip: (page - 1) * limit, take: limit }),
+        prisma.lead.count({ where }),
+      ]);
+      return json({ items, total, page, limit });
+    }
+
+    const leads = await prisma.lead.findMany({ where, orderBy, include });
     return json(leads);
   } catch (err) {
     return handleError(err);
