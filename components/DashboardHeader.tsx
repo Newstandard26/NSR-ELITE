@@ -1,6 +1,5 @@
 "use client";
 
-import useSWR from "swr";
 import { useSession } from "next-auth/react";
 
 function greeting() {
@@ -12,7 +11,6 @@ function greeting() {
 
 export function DashboardHeader() {
   const { data: session } = useSession();
-  const { data: branding } = useSWR<{ logoUrl?: string | null }>("/api/settings/branding");
   const first = (session?.user?.name || "").split(" ")[0];
 
   return (
@@ -30,7 +28,7 @@ export function DashboardHeader() {
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={branding?.logoUrl || "/brand/logo-badge.svg"}
+        src="/brand/logo-badge.svg"
         alt="NSR Elite"
         className="max-h-10 w-auto object-contain"
       />

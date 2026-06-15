@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import useSWR from "swr";
 import { Map, Users, Calendar, Trophy, LayoutDashboard, Landmark, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -24,7 +23,6 @@ const managerItems = [
 export function SideNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const { data: branding } = useSWR<{ logoUrl?: string | null }>("/api/settings/branding");
   const role = session?.user?.role;
   const isManager = role === "MANAGER" || role === "ADMIN";
 
@@ -34,7 +32,7 @@ export function SideNav() {
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={branding?.logoUrl || "/brand/logo-badge.svg"}
+            src="/brand/logo-badge.svg"
             alt="NSR Elite"
             className="max-h-9 w-auto object-contain"
           />
