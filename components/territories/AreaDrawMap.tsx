@@ -24,8 +24,19 @@ export function AreaDrawMap({ onClose, onSaved }: { onClose: () => void; onSaved
   const [repIds, setRepIds] = useState<string[]>([]);
   const [hasPolygon, setHasPolygon] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [drawingMode, setDrawingMode] = useState(false);
 
   const { data: reps = [] } = useSWR<RepStatsDTO[]>("/api/reps");
+
+  function startDrawing() {
+    drawRef.current?.changeMode("draw_polygon");
+    setDrawingMode(true);
+  }
+  function clearPolygon() {
+    drawRef.current?.deleteAll();
+    setHasPolygon(false);
+    setDrawingMode(false);
+  }
 
   useEffect(() => {
     if (mapRef.current || !container.current) return;
@@ -46,7 +57,10 @@ export function AreaDrawMap({ onClose, onSaved }: { onClose: () => void; onSaved
     map.addControl(draw);
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
 
-    const sync = () => setHasPolygon(draw.getAll().features.length > 0);
+    const sync = () => {
+      setHasPolygon(draw.getAll().features.length > 0);
+      setDrawingMode(false);
+    };
     map.on("draw.create", sync);
     map.on("draw.delete", sync);
     map.on("draw.update", sync);
@@ -101,10 +115,24 @@ export function AreaDrawMap({ onClose, onSaved }: { onClose: () => void; onSaved
           </button>
         </div>
 
-        <p className="text-xs text-zinc-400">
-          Use the polygon tool (top-left of the map) to trace the territory. Click to add points,
-          double-click to finish.
-        </p>
+        <div className="space-y-2 rounded-xl border border-zinc-800 p-3">
+          {!hasPolygon ? (
+            <>
+              <Button className="w-full" onClick={startDrawing} disabled={drawingMode}>
+                {drawingMode ? "Drawing… click points on the map" : "✏️ Draw polygon"}
+              </Button>
+              <p className="text-xs text-zinc-400">
+                Click the button, then click points on the map to trace the territory.
+                Double-click (or click the first point) to finish.
+              </p>
+            </>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-green-400">✓ Polygon drawn</span>
+              <Button size="sm" variant="secondary" onClick={clearPolygon}>Redraw</Button>
+            </div>
+          )}
+        </div>
 
         <div className="space-y-1">
           <label className="text-xs uppercase tracking-wide text-zinc-400">Area name</label>
