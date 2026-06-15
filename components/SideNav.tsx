@@ -32,15 +32,12 @@ export function SideNav() {
     <aside className="hidden w-56 shrink-0 flex-col border-r border-zinc-800 bg-black p-3 sm:flex">
       <div className="mb-4 flex items-start justify-between px-2">
         <div>
-          {branding?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={branding.logoUrl} alt="Logo" className="max-h-10 w-auto object-contain" />
-          ) : (
-            <>
-              <p className="text-lg font-semibold text-nsr-blue">NSR</p>
-              <p className="text-xs text-zinc-500">Canvassing</p>
-            </>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={branding?.logoUrl || "/brand/logo-badge.svg"}
+            alt="NSR Elite"
+            className="max-h-9 w-auto object-contain"
+          />
         </div>
         <NotificationBell />
       </div>

@@ -27,8 +27,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-black p-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold text-nsr-blue">NSR Canvassing</h1>
-          <p className="text-sm text-zinc-400">New Standard Restoration</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/logo-full.svg" alt="NSR Elite Door Knocker" className="mx-auto w-60" />
+          <p className="mt-3 text-sm text-zinc-400">New Standard Restoration</p>
         </div>
         <div className="space-y-1">
           <label className="text-xs uppercase tracking-wide text-zinc-400">Email</label>

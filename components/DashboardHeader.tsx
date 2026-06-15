@@ -28,12 +28,12 @@ export function DashboardHeader() {
           )}
         </p>
       </div>
-      {branding?.logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={branding.logoUrl} alt="Logo" className="max-h-12 w-auto object-contain" />
-      ) : (
-        <span className="text-lg font-semibold text-nsr-blue">NSR</span>
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={branding?.logoUrl || "/brand/logo-badge.svg"}
+        alt="NSR Elite"
+        className="max-h-10 w-auto object-contain"
+      />
     </div>
   );
 }
