@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { BrandWatermark } from "@/components/BrandWatermark";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { ManagerDashboard } from "@/components/dashboard/ManagerDashboard";
 import { RepDashboard } from "@/components/dashboard/RepDashboard";
@@ -11,17 +12,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* Fixed brand watermark — dashboard content scrolls over the top of it. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 -z-10 flex items-center justify-center"
-      >
-        <img
-          src="/brand/logo-full.svg"
-          alt=""
-          className="w-[94%] max-w-6xl opacity-[0.20]"
-        />
-      </div>
+      <BrandWatermark />
       <div className="relative mx-auto max-w-5xl space-y-6 p-4">
         <DashboardHeader />
         {isManager ? <ManagerDashboard /> : <RepDashboard />}

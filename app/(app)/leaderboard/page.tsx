@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { Trophy, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { BrandWatermark } from "@/components/BrandWatermark";
 
 interface Row {
   repId: string; name: string; doors: number; appointmentsSet: number;
@@ -27,6 +28,7 @@ export default function LeaderboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4">
+      <BrandWatermark />
       <h1 className="text-xl font-semibold">Leaderboard</h1>
 
       <div className="flex flex-wrap items-center gap-2">

@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { BrandWatermark } from "@/components/BrandWatermark";
 import type { RepStatsDTO, LeadDTO } from "@/lib/types";
 
 interface ApptDTO {
@@ -47,6 +48,7 @@ export default function AppointmentsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4">
+      <BrandWatermark />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Appointments</h1>
         <Button onClick={() => setScheduling(true)}>
