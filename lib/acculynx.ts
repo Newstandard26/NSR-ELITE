@@ -21,6 +21,8 @@ export interface LeadPayload {
   // directly if known; otherwise repEmail is matched against AccuLynx users.
   repAcculynxId?: string | null;
   repEmail?: string | null;
+  // Configured AccuLynx lead source id; falls back to auto-resolve when absent.
+  leadSourceId?: string | null;
 }
 
 export interface LeadSource {
@@ -154,7 +156,7 @@ export class AccuLynxService {
    */
   async createLead(data: LeadPayload): Promise<AccuLynxJob> {
     const contact = await this.createContact(data);
-    const leadSourceId = await this.resolveLeadSourceId();
+    const leadSourceId = data.leadSourceId || (await this.resolveLeadSourceId());
 
     // AccuLynx /jobs expects a nested contact reference, a job-site
     // locationAddress (state as a 2-letter abbreviation), and a priority.
@@ -388,6 +390,24 @@ export class AccuLynxService {
     if (params.assignedRep) qs.set("assignedRep", params.assignedRep);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return this.request<AccuLynxJob[]>(`/jobs${suffix}`);
+  }
+
+  /** GET /ping — health check. Returns true on 200. */
+  async ping(): Promise<boolean> {
+    try {
+      await this.request<unknown>("/ping");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** GET /milestones — list the account's job milestones. */
+  async getMilestones(): Promise<{ id: string; name: string }[]> {
+    const res = await this.request<{ items?: { id: string; name: string }[] } | { id: string; name: string }[]>(
+      "/milestones?pageSize=50",
+    );
+    return Array.isArray(res) ? res : res.items ?? [];
   }
 
   /** POST /jobs/{id}/notes */

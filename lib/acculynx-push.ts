@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { acculynx } from "@/lib/acculynx";
 import { logActivity } from "@/lib/activity";
+import { getIntegrationSettings } from "@/lib/settings";
 
 export interface PushResult {
   ok: boolean;
@@ -27,7 +28,9 @@ export async function pushLeadToAccuLynx(leadId: string): Promise<PushResult> {
   });
   const notesText = notes.map((n) => `${n.author}: ${n.content}`).join("\n") || undefined;
 
+  const settings = await getIntegrationSettings();
   const job = await acculynx().createLead({
+    leadSourceId: settings.acculynxLeadSourceId,
     name: lead.ownerName || lead.address,
     address: lead.address,
     city: lead.city,

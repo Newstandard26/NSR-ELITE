@@ -171,6 +171,17 @@ model Appointment {
   @@index([scheduledAt])
 }
 
+// Singleton integration settings (single-workspace for now).
+model IntegrationSettings {
+  id                   String   @id @default("default")
+  acculynxLeadSourceId String?
+  // Array of disposition status ids that trigger an AccuLynx push.
+  triggerStatusIds     Json?
+  // Map of AccuLynx milestone name -> disposition status id.
+  milestoneMap         Json?
+  updatedAt            DateTime @updatedAt
+}
+
 model RepLocation {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

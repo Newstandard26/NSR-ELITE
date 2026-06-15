@@ -4,6 +4,7 @@ import { requireUser, requireRole } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { pushLeadToAccuLynx } from "@/lib/acculynx-push";
 import { logActivity } from "@/lib/activity";
+import { getIntegrationSettings } from "@/lib/settings";
 
 // GET /api/leads/[id] — full lead with notes, photos, appointments.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -79,18 +80,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       );
     }
 
-    // Auto-push to AccuLynx when the lead reaches a "Customer" pipeline stage
-    // and isn't already linked. Best effort — never fail the update on this.
-    if (
-      body.dispositionStatusId &&
-      !lead.acculynxJobId &&
-      lead.dispositionStatus?.pipelineStage === "Customer" &&
-      process.env.ACCULYNX_API_KEY
-    ) {
-      try {
-        await pushLeadToAccuLynx(lead.id);
-      } catch (e) {
-        console.error("Auto-push to AccuLynx failed:", (e as Error).message);
+    // Auto-push to AccuLynx when the lead reaches a configured trigger status
+    // (or, if none configured, the "Customer" pipeline stage). Best effort.
+    if (body.dispositionStatusId && !lead.acculynxJobId && process.env.ACCULYNX_API_KEY) {
+      const settings = await getIntegrationSettings();
+      const triggered =
+        settings.triggerStatusIds.length > 0
+          ? settings.triggerStatusIds.includes(body.dispositionStatusId)
+          : lead.dispositionStatus?.pipelineStage === "Customer";
+      if (triggered) {
+        try {
+          await pushLeadToAccuLynx(lead.id);
+        } catch (e) {
+          console.error("Auto-push to AccuLynx failed:", (e as Error).message);
+        }
       }
     }
 
