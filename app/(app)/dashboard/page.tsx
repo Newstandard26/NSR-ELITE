@@ -19,7 +19,7 @@ export default function DashboardPage() {
         <img
           src="/brand/logo-full.svg"
           alt=""
-          className="w-[78%] max-w-2xl opacity-[0.09]"
+          className="w-[94%] max-w-6xl opacity-[0.20]"
         />
       </div>
       <div className="relative mx-auto max-w-5xl space-y-6 p-4">
