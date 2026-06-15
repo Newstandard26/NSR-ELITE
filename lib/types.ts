@@ -3,13 +3,27 @@
 export interface DispositionStatusDTO {
   id: string;
   label: string;
+  abbreviation: string | null;
   color: string;
   icon: string;
+  pipelineStage: string | null;
   isDefault: boolean;
   isActive: boolean;
   sortOrder: number;
   _count?: { leads: number };
 }
+
+// SalesRabbit-style pipeline stages a disposition can map to.
+export const PIPELINE_STAGES = [
+  "Attempting Contact",
+  "Customer",
+  "Negotiating",
+  "Lost – No Interest",
+  "Lost – No Sale",
+  "Lost – Canceled",
+  "Lost – Disqualified",
+  "Lost – Unfulfilled",
+] as const;
 
 export interface LeadDTO {
   id: string;

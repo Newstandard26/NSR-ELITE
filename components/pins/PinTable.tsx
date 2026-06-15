@@ -18,11 +18,20 @@ export function PinTable() {
   const [creating, setCreating] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
 
+  // Blank abbreviation/stage should clear to null, not store an empty string.
+  function normalize(draft: Partial<PinDraft>) {
+    return {
+      ...draft,
+      ...(draft.abbreviation !== undefined ? { abbreviation: draft.abbreviation || null } : {}),
+      ...(draft.pipelineStage !== undefined ? { pipelineStage: draft.pipelineStage || null } : {}),
+    };
+  }
+
   async function createPin(draft: PinDraft) {
     await fetch("/api/disposition-statuses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(draft),
+      body: JSON.stringify(normalize(draft)),
     });
     setCreating(false);
     mutate();
@@ -32,7 +41,7 @@ export function PinTable() {
     await fetch(`/api/disposition-statuses/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(draft),
+      body: JSON.stringify(normalize(draft)),
     });
     setEditing(null);
     mutate();

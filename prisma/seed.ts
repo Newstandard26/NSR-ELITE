@@ -5,13 +5,13 @@ const prisma = new PrismaClient();
 
 // The 7 default disposition pins. Order controls the rep dropdown sequence.
 const DEFAULT_DISPOSITIONS = [
-  { label: "Not Visited", color: "#3B82F6", icon: "🔵", sortOrder: 1, isDefault: true },
-  { label: "Not Home / No Answer", color: "#EAB308", icon: "🟡", sortOrder: 2 },
-  { label: "Interested / Appointment Set", color: "#22C55E", icon: "🟢", sortOrder: 3 },
-  { label: "Not Interested / Decline", color: "#EF4444", icon: "🔴", sortOrder: 4 },
-  { label: "Do Not Knock", color: "#6B7280", icon: "⚪", sortOrder: 5 },
-  { label: "Callback Requested", color: "#F97316", icon: "🟠", sortOrder: 6 },
-  { label: "Converted / Job in AccuLynx", color: "#A855F7", icon: "🟣", sortOrder: 7 },
+  { label: "Not Visited", abbreviation: "NV", color: "#3B82F6", icon: "🔵", pipelineStage: "Attempting Contact", sortOrder: 1, isDefault: true },
+  { label: "Not Home / No Answer", abbreviation: "NH", color: "#EAB308", icon: "🟡", pipelineStage: "Attempting Contact", sortOrder: 2 },
+  { label: "Interested / Appointment Set", abbreviation: "APPT", color: "#22C55E", icon: "🟢", pipelineStage: "Negotiating", sortOrder: 3 },
+  { label: "Not Interested / Decline", abbreviation: "NI", color: "#EF4444", icon: "🔴", pipelineStage: "Lost – No Interest", sortOrder: 4 },
+  { label: "Do Not Knock", abbreviation: "DNK", color: "#6B7280", icon: "⚪", pipelineStage: "Lost – Disqualified", sortOrder: 5 },
+  { label: "Callback Requested", abbreviation: "CB", color: "#F97316", icon: "🟠", pipelineStage: "Attempting Contact", sortOrder: 6 },
+  { label: "Converted / Job in AccuLynx", abbreviation: "WON", color: "#A855F7", icon: "🟣", pipelineStage: "Customer", sortOrder: 7 },
 ];
 
 // NSR sales reps from the spec.
@@ -24,6 +24,12 @@ async function main() {
     if (!existing) {
       await prisma.dispositionStatus.create({ data: d });
       console.log(`  + disposition: ${d.icon} ${d.label}`);
+    } else {
+      // Backfill abbreviation + pipeline stage on existing default pins.
+      await prisma.dispositionStatus.update({
+        where: { id: existing.id },
+        data: { abbreviation: d.abbreviation, pipelineStage: d.pipelineStage },
+      });
     }
   }
 

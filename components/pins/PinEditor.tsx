@@ -4,12 +4,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmojiPicker } from "./EmojiPicker";
-import type { DispositionStatusDTO } from "@/lib/types";
+import { PIPELINE_STAGES, type DispositionStatusDTO } from "@/lib/types";
 
 export interface PinDraft {
   label: string;
+  abbreviation: string;
   color: string;
   icon: string;
+  pipelineStage: string;
   isDefault: boolean;
 }
 
@@ -27,8 +29,10 @@ export function PinEditor({
 }) {
   const [draft, setDraft] = useState<PinDraft>({
     label: initial?.label ?? "",
+    abbreviation: initial?.abbreviation ?? "",
     color: initial?.color ?? "#51C5F4",
     icon: initial?.icon ?? "🔵",
+    pipelineStage: initial?.pipelineStage ?? "",
     isDefault: initial?.isDefault ?? false,
   });
   const [busy, setBusy] = useState(false);
@@ -71,6 +75,33 @@ export function PinEditor({
             />
           </div>
         </div>
+        <div className="flex-1 space-y-1">
+          <label className="text-xs uppercase tracking-wide text-zinc-400">
+            Abbreviation (map pin, ≤4)
+          </label>
+          <Input
+            value={draft.abbreviation}
+            maxLength={4}
+            onChange={(e) => setDraft((d) => ({ ...d, abbreviation: e.target.value }))}
+            placeholder="e.g. APPT"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs uppercase tracking-wide text-zinc-400">Pipeline stage</label>
+        <select
+          value={draft.pipelineStage}
+          onChange={(e) => setDraft((d) => ({ ...d, pipelineStage: e.target.value }))}
+          className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nsr-blue"
+        >
+          <option value="">— None —</option>
+          {PIPELINE_STAGES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
       </div>
 
       {isCreate && (

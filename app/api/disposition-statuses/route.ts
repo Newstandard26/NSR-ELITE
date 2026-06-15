@@ -24,8 +24,10 @@ export async function GET(req: Request) {
 
 const createSchema = z.object({
   label: z.string().min(1),
+  abbreviation: z.string().max(4).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a hex color"),
   icon: z.string().min(1),
+  pipelineStage: z.string().optional(),
   isDefault: z.boolean().optional(),
 });
 
@@ -47,8 +49,10 @@ export async function POST(req: Request) {
       return tx.dispositionStatus.create({
         data: {
           label: body.label,
+          abbreviation: body.abbreviation || null,
           color: body.color,
           icon: body.icon,
+          pipelineStage: body.pipelineStage || null,
           isDefault: body.isDefault ?? false,
           sortOrder: (max._max.sortOrder ?? 0) + 1,
         },

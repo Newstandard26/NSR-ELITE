@@ -5,8 +5,10 @@ import { handleError, json } from "@/lib/api";
 
 const patchSchema = z.object({
   label: z.string().min(1).optional(),
+  abbreviation: z.string().max(4).nullable().optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   icon: z.string().min(1).optional(),
+  pipelineStage: z.string().nullable().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
