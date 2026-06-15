@@ -392,10 +392,21 @@ export class AccuLynxService {
     return this.request<AccuLynxJob[]>(`/jobs${suffix}`);
   }
 
-  /** GET /ping — health check. Returns true on 200. */
+  /** Health check. Tries /ping (status only); falls back to a known-good call. */
   async ping(): Promise<boolean> {
     try {
-      await this.request<unknown>("/ping");
+      const res = await fetch(`${this.baseUrl}/ping`, {
+        headers: { Authorization: `Bearer ${this.apiKey}`, Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (res.ok) return true;
+    } catch {
+      // fall through to the real-endpoint check
+    }
+    // /ping may not be available; verify connectivity with a lightweight call
+    // we know works (used during contact creation).
+    try {
+      await this.getContactTypes();
       return true;
     } catch {
       return false;
