@@ -180,6 +180,20 @@ model WorkspaceSettings {
   updatedAt  DateTime @updatedAt
 }
 
+// AccuLynx sync audit log (pushes out + webhooks in).
+model SyncLog {
+  id           String   @id @default(cuid())
+  leadId       String?
+  direction    String   // to_acculynx | from_acculynx
+  event        String   // Lead Pushed, Milestone Updated, Push Failed, ...
+  status       String   // success | failed | pending
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
+
 // Singleton integration settings (single-workspace for now).
 model IntegrationSettings {
   id                   String   @id @default("default")

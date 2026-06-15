@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { acculynx } from "@/lib/acculynx";
 import { logActivity } from "@/lib/activity";
 import { getIntegrationSettings } from "@/lib/settings";
+import { logSync } from "@/lib/sync-log";
 
 export interface PushResult {
   ok: boolean;
@@ -29,20 +30,26 @@ export async function pushLeadToAccuLynx(leadId: string): Promise<PushResult> {
   const notesText = notes.map((n) => `${n.author}: ${n.content}`).join("\n") || undefined;
 
   const settings = await getIntegrationSettings();
-  const job = await acculynx().createLead({
-    leadSourceId: settings.acculynxLeadSourceId,
-    name: lead.ownerName || lead.address,
-    address: lead.address,
-    city: lead.city,
-    state: lead.state,
-    zip: lead.zip,
-    phone: lead.phone,
-    email: lead.email,
-    notes: notesText,
-    leadId: lead.id,
-    repAcculynxId: lead.rep?.acculynxId,
-    repEmail: lead.rep?.email,
-  });
+  let job;
+  try {
+    job = await acculynx().createLead({
+      leadSourceId: settings.acculynxLeadSourceId,
+      name: lead.ownerName || lead.address,
+      address: lead.address,
+      city: lead.city,
+      state: lead.state,
+      zip: lead.zip,
+      phone: lead.phone,
+      email: lead.email,
+      notes: notesText,
+      leadId: lead.id,
+      repAcculynxId: lead.rep?.acculynxId,
+      repEmail: lead.rep?.email,
+    });
+  } catch (e) {
+    await logSync("to_acculynx", "Push Failed", "failed", { leadId: lead.id, error: (e as Error).message });
+    throw e;
+  }
 
   // Cache the rep's resolved AccuLynx user id for future pushes.
   const assignedId = (job as { assignedAcculynxUserId?: string }).assignedAcculynxUserId;
@@ -72,6 +79,7 @@ export async function pushLeadToAccuLynx(leadId: string): Promise<PushResult> {
   await logActivity(lead.id, "acculynx_push", `Pushed to AccuLynx (job ${job.id})`, "System", {
     acculynxJobId: job.id,
   });
+  await logSync("to_acculynx", "Lead Pushed", "success", { leadId: lead.id });
 
   return {
     ok: true,

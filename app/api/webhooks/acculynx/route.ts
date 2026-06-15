@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { handleError, json } from "@/lib/api";
 import { logActivity } from "@/lib/activity";
 import { getIntegrationSettings } from "@/lib/settings";
+import { logSync } from "@/lib/sync-log";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
         "AccuLynx",
         { topic: payload.topic, jobId },
       );
+      await logSync("from_acculynx", "Milestone Updated", "success", { leadId: lead.id });
     }
 
     return json({ ok: true, matched: true, leadId: lead.id });

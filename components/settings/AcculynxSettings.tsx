@@ -15,6 +15,7 @@ interface Settings {
 }
 interface NamedId { id: string; name: string; email?: string }
 interface UserRow { id: string; name: string; email: string; acculynxId: string | null }
+interface SyncRow { id: string; direction: string; event: string; status: string; errorMessage: string | null; createdAt: string; leadLabel: string }
 
 export function AcculynxSettings() {
   const { data: settings, mutate } = useSWR<Settings>("/api/settings/integrations/acculynx");
@@ -23,6 +24,12 @@ export function AcculynxSettings() {
   const { data: acculynxUsers = [] } = useSWR<NamedId[]>("/api/acculynx/users");
   const { data: milestones = [] } = useSWR<NamedId[]>("/api/acculynx/milestones");
   const { data: users = [], mutate: mutateUsers } = useSWR<UserRow[]>("/api/users");
+  const { data: syncLog = [], mutate: mutateSync } = useSWR<SyncRow[]>("/api/settings/integrations/acculynx/sync-log?days=7");
+
+  async function retrySync(id: string) {
+    await fetch(`/api/settings/integrations/acculynx/sync-log/${id}/retry`, { method: "POST" });
+    mutateSync();
+  }
 
   const [ping, setPing] = useState<"idle" | "testing" | "ok" | "fail">("idle");
   const [origin, setOrigin] = useState("");
@@ -202,6 +209,36 @@ export function AcculynxSettings() {
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Sync log */}
+      <Card className="space-y-2">
+        <CardTitle>Sync log (last 7 days)</CardTitle>
+        <div className="max-h-72 overflow-y-auto rounded-lg border border-zinc-800">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-zinc-900 text-left text-xs uppercase text-zinc-400">
+              <tr><th className="p-2">Time</th><th className="p-2">Dir</th><th className="p-2">Event</th><th className="p-2">Lead</th><th className="p-2">Status</th><th className="p-2"></th></tr>
+            </thead>
+            <tbody>
+              {syncLog.map((s) => (
+                <tr key={s.id} className="border-t border-zinc-800">
+                  <td className="p-2 text-xs text-zinc-400">{new Date(s.createdAt).toLocaleString()}</td>
+                  <td className="p-2 text-xs">{s.direction === "to_acculynx" ? "→" : "←"}</td>
+                  <td className="p-2">{s.event}</td>
+                  <td className="p-2 text-zinc-400">{s.leadLabel}</td>
+                  <td className="p-2">
+                    <span className={`rounded px-1.5 py-0.5 text-xs ${s.status === "success" ? "bg-green-900 text-green-300" : s.status === "failed" ? "bg-red-900 text-red-300" : "bg-yellow-900 text-yellow-300"}`}>{s.status}</span>
+                    {s.errorMessage && <div className="text-[10px] text-red-400">{s.errorMessage.slice(0, 80)}</div>}
+                  </td>
+                  <td className="p-2">
+                    {s.status === "failed" && <button onClick={() => retrySync(s.id)} className="text-xs text-nsr-blue hover:underline">Retry</button>}
+                  </td>
+                </tr>
+              ))}
+              {syncLog.length === 0 && <tr><td colSpan={6} className="p-3 text-xs text-zinc-500">No sync activity yet.</td></tr>}
             </tbody>
           </table>
         </div>
