@@ -3,10 +3,18 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import useSWR from "swr";
+import { useSession } from "next-auth/react";
 import { LocateFixed, Flame, Filter } from "lucide-react";
 import { LeadCardDrawer } from "./LeadCardDrawer";
 import { MapFilterBar, type MapFilters } from "./MapFilterBar";
 import type { DispositionStatusDTO, LeadDTO } from "@/lib/types";
+
+interface TerritoryDTO {
+  id: string;
+  name: string;
+  color: string;
+  geoJson: unknown;
+}
 
 // Mapbox satellite-streets, dark variant.
 const MAP_STYLE = "mapbox://styles/mapbox/satellite-streets-v12";
@@ -25,6 +33,9 @@ export function MapView() {
   const [filters, setFilters] = useState<MapFilters>({});
 
   const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
+  const { data: territories = [] } = useSWR<TerritoryDTO[]>("/api/territories");
+  const { data: session } = useSession();
+  const isManager = session?.user?.role === "MANAGER" || session?.user?.role === "ADMIN";
 
   // Build the leads query string from active filters.
   const leadsQuery = useMemo(() => {
@@ -94,16 +105,63 @@ export function MapView() {
           setSelectedLead(lead.id);
         });
 
-        const marker = new mapboxgl.Marker({ element: el })
+        const marker = new mapboxgl.Marker({ element: el, draggable: isManager })
           .setLngLat([lead.lng, lead.lat])
           .addTo(map);
+        if (isManager) {
+          marker.on("dragend", () => {
+            const { lng, lat } = marker.getLngLat();
+            fetch(`/api/leads/${lead.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lat, lng }),
+            }).catch(() => {});
+          });
+        }
         markersRef.current.push(marker);
       }
     };
 
     if (map.isStyleLoaded()) renderMarkers();
     else map.once("load", renderMarkers);
-  }, [leads]);
+  }, [leads, isManager]);
+
+  // --- Territory polygon overlay ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      const geojson = {
+        type: "FeatureCollection",
+        features: territories
+          .filter((t) => t.geoJson)
+          .map((t) => ({
+            type: "Feature",
+            geometry: t.geoJson,
+            properties: { color: t.color, name: t.name },
+          })),
+      };
+      if (map.getSource("territories")) {
+        (map.getSource("territories") as mapboxgl.GeoJSONSource).setData(geojson as never);
+      } else {
+        map.addSource("territories", { type: "geojson", data: geojson as never });
+        map.addLayer({
+          id: "territory-fill",
+          type: "fill",
+          source: "territories",
+          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.12 },
+        });
+        map.addLayer({
+          id: "territory-line",
+          type: "line",
+          source: "territories",
+          paint: { "line-color": ["get", "color"], "line-width": 2 },
+        });
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [territories]);
 
   // --- Heatmap toggle ---
   useEffect(() => {

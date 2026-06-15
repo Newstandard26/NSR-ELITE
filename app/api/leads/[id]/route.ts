@@ -35,6 +35,8 @@ const patchSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   roofAge: z.number().int().nullable().optional(),
   insuranceCompany: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
   dispositionStatusId: z.string().nullable().optional(),
   repId: z.string().nullable().optional(),
   territoryId: z.string().nullable().optional(),
