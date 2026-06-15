@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
+import useSWR from "swr";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import type { PlaceDetails } from "@/lib/places";
+import type { RepStatsDTO } from "@/lib/types";
 
 interface LeadFormState {
   address: string;
@@ -39,6 +42,13 @@ export function LeadForm({ onClose, onCreated }: { onClose: () => void; onCreate
   const [form, setForm] = useState<LeadFormState>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [repId, setRepId] = useState("");
+
+  // Reps auto-assign to themselves on the server; only managers/admins need to
+  // pick the rep when entering a lead on someone's behalf.
+  const { data: session } = useSession();
+  const isManager = session?.user?.role === "MANAGER" || session?.user?.role === "ADMIN";
+  const { data: reps = [] } = useSWR<RepStatsDTO[]>(isManager ? "/api/reps" : null);
 
   const set = (patch: Partial<LeadFormState>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -68,6 +78,7 @@ export function LeadForm({ onClose, onCreated }: { onClose: () => void; onCreate
         email: form.email || undefined,
         roofAge: form.roofAge ? parseInt(form.roofAge, 10) : undefined,
         insuranceCompany: form.insuranceCompany || undefined,
+        repId: repId || undefined,
       }),
     });
     setBusy(false);
@@ -117,6 +128,24 @@ export function LeadForm({ onClose, onCreated }: { onClose: () => void; onCreate
             <label className="text-xs uppercase tracking-wide text-zinc-400">Homeowner name</label>
             <Input value={form.ownerName} onChange={(e) => set({ ownerName: e.target.value })} />
           </div>
+
+          {isManager && (
+            <div>
+              <label className="text-xs uppercase tracking-wide text-zinc-400">Assign to rep</label>
+              <select
+                value={repId}
+                onChange={(e) => setRepId(e.target.value)}
+                className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nsr-blue"
+              >
+                <option value="">Unassigned</option>
+                {reps.map((r) => (
+                  <option key={r.repId} value={r.repId}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs uppercase tracking-wide text-zinc-400">Phone</label>
