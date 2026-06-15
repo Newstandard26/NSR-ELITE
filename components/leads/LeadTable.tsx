@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { Plus, Download, Filter, ChevronUp, ChevronDown, Trash2, X, Settings2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { DispositionBadge } from "@/components/ui/badge";
 import { CsvImport } from "./CsvImport";
 import { LeadForm } from "./LeadForm";
-import { LeadCardDrawer } from "@/components/map/LeadCardDrawer";
 import type { DispositionStatusDTO, LeadDTO, RepStatsDTO } from "@/lib/types";
 
 interface Paged {
@@ -29,9 +29,9 @@ const ALL_COLUMNS = [
 type ColKey = (typeof ALL_COLUMNS)[number]["key"];
 
 export function LeadTable() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [sort, setSort] = useState("updatedAt");
@@ -245,17 +245,17 @@ export function LeadTable() {
           </thead>
           <tbody>
             {leads.map((l) => (
-              <tr key={l.id} className="border-t border-zinc-800 hover:bg-zinc-900">
+              <tr
+                key={l.id}
+                className="cursor-pointer border-t border-zinc-800 hover:bg-zinc-900"
+                onClick={() => router.push(`/leads/${l.id}`)}
+              >
                 <td className="p-3" onClick={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={selected.has(l.id)} onChange={() => toggleSelect(l.id)} />
                 </td>
-                {show("owner") && (
-                  <td className="cursor-pointer p-3" onClick={() => setSelectedLead(l.id)}>
-                    {l.ownerName || "—"}
-                  </td>
-                )}
+                {show("owner") && <td className="p-3">{l.ownerName || "—"}</td>}
                 {show("address") && (
-                  <td className="cursor-pointer p-3 text-zinc-400" onClick={() => setSelectedLead(l.id)}>
+                  <td className="p-3 text-zinc-400">
                     {l.address}, {l.city} {l.state}
                   </td>
                 )}
@@ -308,15 +308,6 @@ export function LeadTable() {
           <Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
         </div>
       </div>
-
-      {selectedLead && (
-        <LeadCardDrawer
-          leadId={selectedLead}
-          statuses={statuses}
-          onClose={() => setSelectedLead(null)}
-          onChanged={() => mutate()}
-        />
-      )}
     </div>
   );
 }

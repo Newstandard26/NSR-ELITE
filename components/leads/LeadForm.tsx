@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import type { PlaceDetails } from "@/lib/places";
-import type { RepStatsDTO } from "@/lib/types";
+import type { DispositionStatusDTO, RepStatsDTO } from "@/lib/types";
 
 interface LeadFormState {
   address: string;
@@ -22,6 +22,7 @@ interface LeadFormState {
   email: string;
   roofAge: string;
   insuranceCompany: string;
+  notes: string;
 }
 
 const EMPTY: LeadFormState = {
@@ -34,6 +35,7 @@ const EMPTY: LeadFormState = {
   email: "",
   roofAge: "",
   insuranceCompany: "",
+  notes: "",
 };
 
 // Manual lead entry. Address comes from Google Places autocomplete, which
@@ -43,12 +45,22 @@ export function LeadForm({ onClose, onCreated }: { onClose: () => void; onCreate
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [repId, setRepId] = useState("");
+  const [dispositionId, setDispositionId] = useState("");
 
   // Reps auto-assign to themselves on the server; only managers/admins need to
   // pick the rep when entering a lead on someone's behalf.
   const { data: session } = useSession();
   const isManager = session?.user?.role === "MANAGER" || session?.user?.role === "ADMIN";
   const { data: reps = [] } = useSWR<RepStatsDTO[]>(isManager ? "/api/reps" : null);
+  const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
+
+  // Default the disposition to the pin marked default.
+  useEffect(() => {
+    if (!dispositionId && statuses.length) {
+      const def = statuses.find((s) => s.isDefault) ?? statuses[0];
+      if (def) setDispositionId(def.id);
+    }
+  }, [statuses, dispositionId]);
 
   const set = (patch: Partial<LeadFormState>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -79,6 +91,8 @@ export function LeadForm({ onClose, onCreated }: { onClose: () => void; onCreate
         roofAge: form.roofAge ? parseInt(form.roofAge, 10) : undefined,
         insuranceCompany: form.insuranceCompany || undefined,
         repId: repId || undefined,
+        dispositionStatusId: dispositionId || undefined,
+        notes: form.notes || undefined,
       }),
     });
     setBusy(false);
@@ -146,6 +160,20 @@ export function LeadForm({ onClose, onCreated }: { onClose: () => void; onCreate
               </select>
             </div>
           )}
+
+          <div>
+            <label className="text-xs uppercase tracking-wide text-zinc-400">Disposition</label>
+            <select
+              value={dispositionId}
+              onChange={(e) => setDispositionId(e.target.value)}
+              className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nsr-blue"
+            >
+              {statuses.filter((s) => s.isActive).map((s) => (
+                <option key={s.id} value={s.id}>{s.icon} {s.label}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs uppercase tracking-wide text-zinc-400">Phone</label>
@@ -171,6 +199,17 @@ export function LeadForm({ onClose, onCreated }: { onClose: () => void; onCreate
                 onChange={(e) => set({ insuranceCompany: e.target.value })}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs uppercase tracking-wide text-zinc-400">Notes</label>
+            <Textarea
+              rows={2}
+              value={form.notes}
+              maxLength={1000}
+              onChange={(e) => set({ notes: e.target.value })}
+              placeholder="Add any notes about this lead…"
+            />
           </div>
 
           {form.lat != null && form.lat !== 0 && (

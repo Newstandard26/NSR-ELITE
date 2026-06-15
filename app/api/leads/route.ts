@@ -98,6 +98,7 @@ const createSchema = z.object({
   dispositionStatusId: z.string().optional(),
   repId: z.string().optional(),
   territoryId: z.string().optional(),
+  notes: z.string().max(1000).optional(),
 });
 
 // POST /api/leads — create a lead. Geocodes if lat/lng absent.
@@ -144,6 +145,12 @@ export async function POST(req: Request) {
       `Lead created${lead.rep ? ` and assigned to ${lead.rep.name}` : ""}`,
       user.name,
     );
+    if (body.notes) {
+      await prisma.note.create({
+        data: { leadId: lead.id, content: body.notes, author: user.name || "Rep", authorUserId: user.id },
+      });
+      await logActivity(lead.id, "note_added", body.notes, user.name);
+    }
     return json(lead, 201);
   } catch (err) {
     return handleError(err);
