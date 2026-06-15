@@ -10,9 +10,22 @@ export default function DashboardPage() {
   const isManager = session?.user?.role === "MANAGER" || session?.user?.role === "ADMIN";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4">
-      <DashboardHeader />
-      {isManager ? <ManagerDashboard /> : <RepDashboard />}
-    </div>
+    <>
+      {/* Fixed brand watermark — dashboard content scrolls over the top of it. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 flex items-center justify-center"
+      >
+        <img
+          src="/brand/logo-full.svg"
+          alt=""
+          className="w-[78%] max-w-2xl opacity-[0.09]"
+        />
+      </div>
+      <div className="relative mx-auto max-w-5xl space-y-6 p-4">
+        <DashboardHeader />
+        {isManager ? <ManagerDashboard /> : <RepDashboard />}
+      </div>
+    </>
   );
 }
