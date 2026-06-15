@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
-import { LocateFixed, Flame, Filter } from "lucide-react";
+import { LocateFixed, Flame, Filter, Plus, Search } from "lucide-react";
 import { LeadCardDrawer } from "./LeadCardDrawer";
 import { MapFilterBar, type MapFilters } from "./MapFilterBar";
+import { LeadForm } from "@/components/leads/LeadForm";
 import type { DispositionStatusDTO, LeadDTO } from "@/lib/types";
 
 interface TerritoryDTO {
@@ -31,6 +32,10 @@ export function MapView() {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<MapFilters>({});
+  const [addingLead, setAddingLead] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchResults, setSearchResults] = useState<{ placeId: string; description: string }[]>([]);
+  const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
   const { data: territories = [] } = useSWR<TerritoryDTO[]>("/api/territories");
@@ -202,6 +207,32 @@ export function MapView() {
     else map.once("load", apply);
   }, [showHeatmap, leads]);
 
+  // --- Address search ---
+  async function runSearch(q: string) {
+    setSearchQ(q);
+    if (q.trim().length < 3) {
+      setSearchResults([]);
+      return;
+    }
+    const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(q)}`);
+    const data = await res.json().catch(() => ({}));
+    setSearchResults(data.predictions || []);
+  }
+  async function gotoSearchResult(placeId: string, description: string) {
+    setSearchResults([]);
+    setSearchQ(description);
+    const res = await fetch(`/api/places/details?placeId=${encodeURIComponent(placeId)}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    const map = mapRef.current;
+    if (!map || !d.lat) return;
+    map.flyTo({ center: [d.lng, d.lat], zoom: 16 });
+    searchMarkerRef.current?.remove();
+    const el = document.createElement("div");
+    el.style.cssText = "width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid #51C5F4;";
+    searchMarkerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([d.lng, d.lat]).addTo(map);
+  }
+
   // --- GPS: center on rep location ---
   function showMyLocation() {
     if (!navigator.geolocation) return alert("Geolocation not available");
@@ -244,7 +275,30 @@ export function MapView() {
           >
             <Filter className="h-4 w-4" /> Filters
           </button>
-          <span className="rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-2 text-xs text-zinc-300 backdrop-blur">
+          {/* Address search */}
+          <div className="relative flex-1 max-w-md">
+            <div className="flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 backdrop-blur">
+              <Search className="h-4 w-4 text-zinc-400" />
+              <input
+                value={searchQ}
+                onChange={(e) => runSearch(e.target.value)}
+                placeholder="Search an address…"
+                className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-zinc-500"
+              />
+            </div>
+            {searchResults.length > 0 && (
+              <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
+                {searchResults.map((r) => (
+                  <li key={r.placeId}>
+                    <button onClick={() => gotoSearchResult(r.placeId, r.description)} className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-800">
+                      {r.description}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <span className="hidden rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-2 text-xs text-zinc-300 backdrop-blur sm:inline">
             {leads.length} leads
           </span>
         </div>
@@ -277,6 +331,17 @@ export function MapView() {
           <LocateFixed className="h-5 w-5" />
         </button>
       </div>
+
+      {/* Add Lead FAB */}
+      <button
+        onClick={() => setAddingLead(true)}
+        aria-label="Add lead"
+        className="absolute bottom-24 left-3 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-nsr-blue text-black shadow-lg sm:bottom-6"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
+      {addingLead && <LeadForm onClose={() => setAddingLead(false)} onCreated={() => refetchLeads()} />}
 
       {selectedLead && (
         <LeadCardDrawer
