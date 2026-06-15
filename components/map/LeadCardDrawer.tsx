@@ -10,7 +10,7 @@ import { Textarea, Input } from "@/components/ui/input";
 import { DispositionBadge } from "@/components/ui/badge";
 import { DispositionSelector } from "./DispositionSelector";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-import type { DispositionStatusDTO, LeadDTO, NoteDTO } from "@/lib/types";
+import type { DispositionStatusDTO, LeadDTO, NoteDTO, RepStatsDTO } from "@/lib/types";
 
 interface LeadDetail extends LeadDTO {
   notes: NoteDTO[];
@@ -29,6 +29,7 @@ export function LeadCardDrawer({
   onChanged: () => void;
 }) {
   const { data: lead, mutate } = useSWR<LeadDetail>(`/api/leads/${leadId}`);
+  const { data: reps = [] } = useSWR<RepStatsDTO[]>("/api/reps");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [apptOpen, setApptOpen] = useState(false);
@@ -41,6 +42,18 @@ export function LeadCardDrawer({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dispositionStatusId }),
+    });
+    await mutate();
+    onChanged();
+    setBusy(null);
+  }
+
+  async function assignRep(repId: string) {
+    setBusy("rep");
+    await fetch(`/api/leads/${leadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repId: repId || null }),
     });
     await mutate();
     onChanged();
@@ -172,6 +185,24 @@ export function LeadCardDrawer({
               onChange={updateDisposition}
               disabled={busy === "disposition"}
             />
+
+            {/* Assigned rep — becomes the AccuLynx sales owner on push. */}
+            <div className="space-y-1">
+              <label className="text-xs uppercase tracking-wide text-zinc-400">Assigned rep</label>
+              <select
+                value={lead.repId ?? ""}
+                onChange={(e) => assignRep(e.target.value)}
+                disabled={busy === "rep"}
+                className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nsr-blue"
+              >
+                <option value="">Unassigned</option>
+                {reps.map((r) => (
+                  <option key={r.repId} value={r.repId}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Action buttons */}
             <div className="grid grid-cols-2 gap-2">
