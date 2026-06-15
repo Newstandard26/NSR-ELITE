@@ -89,6 +89,20 @@ export function LeadCardDrawer({
           `${err.status ? ` (HTTP ${err.status})` : ""}` +
           `${detail ? `\n\nAccuLynx said:\n${detail}` : ""}`,
       );
+    } else {
+      // Report whether the rep was assigned as the AccuLynx sales owner.
+      const body = await res.json().catch(() => ({}));
+      const a = body?.job?.repAssignment;
+      let msg = "Lead pushed to AccuLynx.";
+      if (a) {
+        if (a.assigned) msg += "\n\n✅ Rep assigned as sales owner.";
+        else if (a.error) msg += `\n\n⚠️ Rep assign call failed:\n${a.error}`;
+        else if (a.attempted && !a.matched)
+          msg += `\n\n⚠️ No AccuLynx user matched the rep's email${a.repEmail ? ` (${a.repEmail})` : ""}. Job created but unassigned.`;
+        else if (!a.attempted)
+          msg += "\n\n⚠️ This lead has no assigned rep, so AccuLynx is unassigned. Pick an 'Assigned rep' first.";
+      }
+      alert(msg);
     }
     await mutate();
     onChanged();

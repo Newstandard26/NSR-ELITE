@@ -178,21 +178,38 @@ export class AccuLynxService {
     });
 
     // Assign the canvassing rep as the AccuLynx sales owner (best effort —
-    // a failure here should not undo the created job).
+    // a failure here should not undo the created job). Capture diagnostics so
+    // the UI can explain why a rep was/wasn't assigned.
     let assignedAcculynxUserId: string | undefined;
+    const repAssignment: {
+      attempted: boolean;
+      repEmail?: string;
+      matched: boolean;
+      assigned: boolean;
+      error?: string;
+    } = { attempted: false, matched: false, assigned: false };
     try {
-      const repId =
-        data.repAcculynxId ||
-        (data.repEmail ? await this.resolveUserIdByEmail(data.repEmail) : undefined);
+      let repId = data.repAcculynxId || undefined;
+      if (repId) {
+        repAssignment.attempted = true;
+        repAssignment.matched = true;
+      } else if (data.repEmail) {
+        repAssignment.attempted = true;
+        repAssignment.repEmail = data.repEmail;
+        repId = await this.resolveUserIdByEmail(data.repEmail);
+        repAssignment.matched = !!repId;
+      }
       if (repId && job.id) {
         await this.assignSalesRep(job.id, repId);
         assignedAcculynxUserId = repId;
+        repAssignment.assigned = true;
       }
     } catch (e) {
-      console.error("AccuLynx rep assignment failed:", (e as Error).message);
+      repAssignment.error = (e as Error).message;
+      console.error("AccuLynx rep assignment failed:", repAssignment.error);
     }
 
-    return { ...job, contactId: contact.id, assignedAcculynxUserId };
+    return { ...job, contactId: contact.id, assignedAcculynxUserId, repAssignment };
   }
 
   /** GET /lead-sources — list the account's active lead sources. */
