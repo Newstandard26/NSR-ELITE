@@ -1,26 +1,40 @@
 import { prisma } from "@/lib/db";
 import { handleError, json } from "@/lib/api";
+import { logActivity } from "@/lib/activity";
 
-// POST /api/webhooks/acculynx — receive real-time job/milestone updates.
-// Validates an optional shared secret, then maps the job id to a local lead.
+export const dynamic = "force-dynamic";
+
+// POST /api/webhooks/acculynx?secret=... — receive real-time AccuLynx events.
+// AccuLynx secures webhooks with a secret query param (no payload signing), so
+// we validate ?secret against ACCULYNX_WEBHOOK_SECRET when configured.
 export async function POST(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
     const secret = process.env.ACCULYNX_WEBHOOK_SECRET;
     if (secret) {
       const provided =
-        req.headers.get("x-acculynx-signature") || req.headers.get("x-webhook-secret");
-      if (provided !== secret) return json({ error: "Invalid signature" }, 401);
+        searchParams.get("secret") ||
+        req.headers.get("x-acculynx-signature") ||
+        req.headers.get("x-webhook-secret");
+      if (provided !== secret) return json({ error: "Invalid secret" }, 401);
     }
 
-    const payload = (await req.json()) as {
+    // AccuLynx topic-based payloads, with tolerant fallbacks for flat shapes.
+    const payload = (await req.json().catch(() => ({}))) as {
+      topic?: string;
       jobId?: string;
       id?: string;
-      milestone?: string;
+      milestone?: { name?: string; id?: string } | string;
       status?: string;
     };
+
     const jobId = payload.jobId || payload.id;
-    const milestone = payload.milestone || payload.status;
-    if (!jobId) return json({ error: "Missing jobId" }, 400);
+    const milestoneName =
+      typeof payload.milestone === "string"
+        ? payload.milestone
+        : payload.milestone?.name || payload.status;
+
+    if (!jobId) return json({ ok: true, matched: false });
 
     const lead = await prisma.lead.findFirst({ where: { acculynxJobId: jobId } });
     if (!lead) {
@@ -28,12 +42,20 @@ export async function POST(req: Request) {
       return json({ ok: true, matched: false });
     }
 
-    if (milestone) {
+    if (milestoneName && milestoneName !== lead.acculynxStatus) {
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { acculynxStatus: milestone },
+        data: { acculynxStatus: milestoneName },
       });
+      await logActivity(
+        lead.id,
+        "acculynx_milestone",
+        `AccuLynx milestone changed to ${milestoneName}`,
+        "AccuLynx",
+        { topic: payload.topic, jobId },
+      );
     }
+
     return json({ ok: true, matched: true, leadId: lead.id });
   } catch (err) {
     return handleError(err);
