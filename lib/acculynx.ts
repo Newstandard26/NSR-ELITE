@@ -205,7 +205,10 @@ export class AccuLynxService {
         repAssignment.assigned = true;
       }
     } catch (e) {
-      repAssignment.error = (e as Error).message;
+      repAssignment.error =
+        e instanceof AccuLynxError
+          ? `${e.message} (HTTP ${e.status}) ${JSON.stringify(e.body)}`
+          : (e as Error).message;
       console.error("AccuLynx rep assignment failed:", repAssignment.error);
     }
 
@@ -334,20 +337,20 @@ export class AccuLynxService {
     });
   }
 
-  /** GET /users — all active AccuLynx users (paginated). */
+  /** GET /users — all AccuLynx users (paginated; AccuLynx uses pageStartIndex). */
   async getUsers(): Promise<AccuLynxUser[]> {
     const all: AccuLynxUser[] = [];
     const pageSize = 100;
-    let startIndex = 0;
+    let pageStartIndex = 0;
     // Safety cap to avoid runaway loops.
     for (let i = 0; i < 25; i++) {
       const res = await this.request<{ items?: AccuLynxUser[] } | AccuLynxUser[]>(
-        `/users?pageSize=${pageSize}&startIndex=${startIndex}`,
+        `/users?pageSize=${pageSize}&pageStartIndex=${pageStartIndex}`,
       );
       const items = Array.isArray(res) ? res : res.items ?? [];
       all.push(...items);
       if (items.length < pageSize) break;
-      startIndex += pageSize;
+      pageStartIndex += pageSize;
     }
     return all;
   }
