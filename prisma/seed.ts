@@ -33,7 +33,15 @@ async function main() {
     }
   }
 
-  // --- Seed users ---
+  // --- Seed users (only on a fresh database) ---
+  // Skipping when users already exist avoids re-creating accounts whose email
+  // was later changed in the app (which would otherwise duplicate them).
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0) {
+    console.log(`\n${existingUsers} users already exist — skipping user seed.`);
+    return;
+  }
+
   // Default dev password for all seeded accounts. Change in production.
   const defaultPassword = process.env.SEED_PASSWORD || "ChangeMe123!";
   const passwordHash = await bcrypt.hash(defaultPassword, 10);
