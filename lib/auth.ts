@@ -43,6 +43,22 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
+  events: {
+    // Record each successful login for usage analytics. Best effort — a
+    // tracking failure must never block sign-in.
+    async signIn({ user }) {
+      const id = (user as { id?: string })?.id;
+      if (!id) return;
+      try {
+        await prisma.$transaction([
+          prisma.loginEvent.create({ data: { userId: id } }),
+          prisma.user.update({ where: { id }, data: { lastLoginAt: new Date() } }),
+        ]);
+      } catch (e) {
+        console.error("login tracking failed:", (e as Error).message);
+      }
+    },
+  },
 };
 
 export function getSession() {

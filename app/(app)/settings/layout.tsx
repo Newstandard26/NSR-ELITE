@@ -29,6 +29,11 @@ export default async function SettingsLayout({ children }: { children: React.Rea
             Integrations
           </Link>
         )}
+        {isAdmin && (
+          <Link href="/settings/analytics" className="rounded-lg px-3 py-1.5 hover:bg-zinc-800">
+            Analytics
+          </Link>
+        )}
       </nav>
       {children}
     </div>
