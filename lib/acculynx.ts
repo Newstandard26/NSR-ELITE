@@ -17,6 +17,10 @@ export interface LeadPayload {
   notes?: string | null;
   // Canvassing lead id, stored on the AccuLynx contact for traceability.
   leadId?: string | null;
+  // Assigned rep, used to set the AccuLynx sales owner. acculynxId is used
+  // directly if known; otherwise repEmail is matched against AccuLynx users.
+  repAcculynxId?: string | null;
+  repEmail?: string | null;
 }
 
 export interface LeadSource {
@@ -99,6 +103,8 @@ export class AccuLynxService {
   private contactTypeId?: string;
   // Cached resolved lead source id.
   private leadSourceId?: string;
+  // Cached AccuLynx users keyed by lowercased email, for rep auto-linking.
+  private usersByEmail?: Map<string, string>;
 
   constructor(apiKey = process.env.ACCULYNX_API_KEY, baseUrl = BASE_URL) {
     if (!apiKey) {
@@ -170,7 +176,23 @@ export class AccuLynxService {
       method: "POST",
       body: JSON.stringify(jobBody),
     });
-    return { ...job, contactId: contact.id };
+
+    // Assign the canvassing rep as the AccuLynx sales owner (best effort —
+    // a failure here should not undo the created job).
+    let assignedAcculynxUserId: string | undefined;
+    try {
+      const repId =
+        data.repAcculynxId ||
+        (data.repEmail ? await this.resolveUserIdByEmail(data.repEmail) : undefined);
+      if (repId && job.id) {
+        await this.assignSalesRep(job.id, repId);
+        assignedAcculynxUserId = repId;
+      }
+    } catch (e) {
+      console.error("AccuLynx rep assignment failed:", (e as Error).message);
+    }
+
+    return { ...job, contactId: contact.id, assignedAcculynxUserId };
   }
 
   /** GET /lead-sources — list the account's active lead sources. */
@@ -295,9 +317,45 @@ export class AccuLynxService {
     });
   }
 
-  /** GET /users — resolve user IDs to names. */
-  getUsers(): Promise<AccuLynxUser[]> {
-    return this.request<AccuLynxUser[]>("/users");
+  /** GET /users — all active AccuLynx users (paginated). */
+  async getUsers(): Promise<AccuLynxUser[]> {
+    const all: AccuLynxUser[] = [];
+    const pageSize = 100;
+    let startIndex = 0;
+    // Safety cap to avoid runaway loops.
+    for (let i = 0; i < 25; i++) {
+      const res = await this.request<{ items?: AccuLynxUser[] } | AccuLynxUser[]>(
+        `/users?pageSize=${pageSize}&startIndex=${startIndex}`,
+      );
+      const items = Array.isArray(res) ? res : res.items ?? [];
+      all.push(...items);
+      if (items.length < pageSize) break;
+      startIndex += pageSize;
+    }
+    return all;
+  }
+
+  /** Resolve an AccuLynx user id by email (cached). Returns undefined if no match. */
+  async resolveUserIdByEmail(email: string): Promise<string | undefined> {
+    if (!this.usersByEmail) {
+      const users = await this.getUsers();
+      this.usersByEmail = new Map();
+      for (const u of users) {
+        // Prefer active users; skip explicitly inactive ones.
+        const status = (u as { status?: string }).status;
+        if (status && status.toLowerCase() !== "active") continue;
+        if (u.email) this.usersByEmail.set(u.email.toLowerCase(), u.id);
+      }
+    }
+    return this.usersByEmail.get(email.toLowerCase());
+  }
+
+  /** POST /jobs/{id}/representatives/company — set the job's sales owner. */
+  assignSalesRep(jobId: string, acculynxUserId: string): Promise<void> {
+    return this.request<void>(
+      `/jobs/${encodeURIComponent(jobId)}/representatives/company`,
+      { method: "POST", body: JSON.stringify({ id: acculynxUserId }) },
+    );
   }
 
   /** GET /jobs with optional filters. */

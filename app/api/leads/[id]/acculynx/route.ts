@@ -9,7 +9,10 @@ import { acculynx } from "@/lib/acculynx";
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   try {
     await requireUser();
-    const lead = await prisma.lead.findUnique({ where: { id: params.id } });
+    const lead = await prisma.lead.findUnique({
+      where: { id: params.id },
+      include: { rep: { select: { id: true, email: true, acculynxId: true } } },
+    });
     if (!lead) return json({ error: "Lead not found" }, 404);
     if (lead.acculynxJobId) {
       return json({ error: "Lead already linked to AccuLynx", jobId: lead.acculynxJobId }, 409);
@@ -32,7 +35,18 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       email: lead.email,
       notes: notesText,
       leadId: lead.id,
+      repAcculynxId: lead.rep?.acculynxId,
+      repEmail: lead.rep?.email,
     });
+
+    // Cache the rep's resolved AccuLynx user id for future pushes.
+    const assignedId = (job as { assignedAcculynxUserId?: string }).assignedAcculynxUserId;
+    if (assignedId && lead.rep && !lead.rep.acculynxId) {
+      await prisma.user.update({
+        where: { id: lead.rep.id },
+        data: { acculynxId: assignedId },
+      });
+    }
 
     // Find the "Converted" disposition to flip the lead automatically.
     const converted = await prisma.dispositionStatus.findFirst({
