@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { acculynx } from "@/lib/acculynx";
+import { logActivity } from "@/lib/activity";
 
 // GET /api/appointments — reps see their own; managers/admins see all.
 // Filters: rep, from, to, status
@@ -42,7 +43,8 @@ export async function GET(req: Request) {
 const createSchema = z.object({
   leadId: z.string(),
   scheduledAt: z.string(), // ISO datetime
-  type: z.enum(["INSPECTION", "ESTIMATE", "FOLLOWUP"]),
+  type: z.enum(["INSPECTION", "ESTIMATE", "FOLLOWUP"]).default("INSPECTION"),
+  durationMinutes: z.number().int().optional(),
   notes: z.string().optional(),
   repId: z.string().optional(),
   pushToAcculynx: z.boolean().optional(),
@@ -60,13 +62,21 @@ export async function POST(req: Request) {
         repId: body.repId ?? user.id,
         scheduledAt: new Date(body.scheduledAt),
         type: body.type,
+        durationMinutes: body.durationMinutes ?? 60,
         notes: body.notes,
       },
       include: {
         rep: { select: { id: true, name: true } },
-        lead: { select: { id: true, address: true, acculynxJobId: true } },
+        lead: { select: { id: true, address: true, ownerName: true, acculynxJobId: true } },
       },
     });
+
+    await logActivity(
+      appointment.leadId,
+      "appointment_set",
+      `Appointment (${body.type.toLowerCase()}) scheduled for ${new Date(body.scheduledAt).toLocaleString()}`,
+      user.name,
+    );
 
     if (body.pushToAcculynx && appointment.lead.acculynxJobId) {
       try {

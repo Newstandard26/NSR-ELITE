@@ -8,6 +8,7 @@ export type ActivityType =
   | "rep_changed"
   | "acculynx_push"
   | "acculynx_milestone"
+  | "appointment_set"
   | "lead_imported";
 
 // Records an entry on a lead's activity feed. Best effort — logging a timeline

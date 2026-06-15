@@ -162,6 +162,7 @@ model Appointment {
   repId       String
   scheduledAt DateTime
   type        String // INSPECTION, ESTIMATE, FOLLOWUP
+  durationMinutes Int   @default(60)
   notes       String?
   status      String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
   createdAt   DateTime @default(now())
