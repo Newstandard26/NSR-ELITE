@@ -95,7 +95,7 @@ export function UserAnalytics() {
   const arrow = (key: SortKey) => (sort === key ? (asc ? " ↑" : " ↓") : "");
 
   const numCols: { key: SortKey; label: string }[] = [
-    { key: "logins", label: "Logins" },
+    { key: "logins", label: "App Opens" },
     { key: "activeDays", label: "Active Days" },
     { key: "leads", label: "Leads" },
     { key: "appts", label: "Appts" },
