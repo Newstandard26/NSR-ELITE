@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
-import { LocateFixed, Flame, Filter, Plus, Search } from "lucide-react";
+import { LocateFixed, Flame, Filter, Plus, Search, MapPin } from "lucide-react";
 import { LeadCardDrawer } from "./LeadCardDrawer";
 import { MapFilterBar, type MapFilters } from "./MapFilterBar";
 import { LeadForm } from "@/components/leads/LeadForm";
@@ -57,6 +57,17 @@ export function MapView() {
     `/api/leads${leadsQuery ? `?${leadsQuery}` : ""}`,
   );
 
+  // Refs so the one-time map click handler always sees current values.
+  const [dropMode, setDropMode] = useState(false);
+  const dropModeRef = useRef(false);
+  const refetchRef = useRef(refetchLeads);
+  refetchRef.current = refetchLeads;
+  useEffect(() => {
+    dropModeRef.current = dropMode;
+    const map = mapRef.current;
+    if (map) map.getCanvas().style.cursor = dropMode ? "crosshair" : "";
+  }, [dropMode]);
+
   // --- Initialize map once ---
   useEffect(() => {
     if (mapRef.current || !mapContainer.current) return;
@@ -75,6 +86,26 @@ export function MapView() {
     });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
     mapRef.current = map;
+
+    // Tap-to-drop: in drop mode, clicking the map creates a lead at that point.
+    map.on("click", async (e) => {
+      if (!dropModeRef.current) return;
+      const { lng, lat } = e.lngLat;
+      try {
+        const res = await fetch("/api/leads/drop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lng }),
+        });
+        if (res.ok) {
+          const lead = await res.json();
+          await refetchRef.current();
+          setSelectedLead(lead.id);
+        }
+      } catch {
+        /* ignore */
+      }
+    });
 
     return () => {
       map.remove();
@@ -315,6 +346,15 @@ export function MapView() {
       {/* Floating controls */}
       <div className="absolute bottom-24 right-3 z-10 flex flex-col gap-2 sm:bottom-6">
         <button
+          onClick={() => setDropMode((v) => !v)}
+          aria-label="Drop pin mode"
+          className={`flex h-11 w-11 items-center justify-center rounded-full border border-zinc-700 backdrop-blur ${
+            dropMode ? "bg-nsr-blue text-black" : "bg-zinc-900/90 text-white"
+          }`}
+        >
+          <MapPin className="h-5 w-5" />
+        </button>
+        <button
           onClick={() => setShowHeatmap((v) => !v)}
           aria-label="Toggle heatmap"
           className={`flex h-11 w-11 items-center justify-center rounded-full border border-zinc-700 backdrop-blur ${
@@ -331,6 +371,15 @@ export function MapView() {
           <LocateFixed className="h-5 w-5" />
         </button>
       </div>
+
+      {/* Drop-mode hint */}
+      {dropMode && (
+        <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center">
+          <span className="rounded-full bg-nsr-blue px-4 py-1.5 text-sm font-semibold text-black shadow-lg">
+            Tap a house to drop a pin
+          </span>
+        </div>
+      )}
 
       {/* Add Lead FAB */}
       <button

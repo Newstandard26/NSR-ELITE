@@ -39,3 +39,42 @@ export function composeAddress(parts: {
 }): string {
   return `${parts.address}, ${parts.city}, ${parts.state} ${parts.zip}`.trim();
 }
+
+export interface ReverseResult {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+// Reverse-geocode a lat/lng to address components (for tap-to-drop pins).
+export async function reverseGeocode(lat: number, lng: number): Promise<ReverseResult> {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  const fallback = { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, city: "", state: "", zip: "" };
+  if (!key) return fallback;
+  try {
+    const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+    url.searchParams.set("latlng", `${lat},${lng}`);
+    url.searchParams.set("key", key);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    const data = (await res.json()) as {
+      status: string;
+      results: { address_components: { long_name: string; short_name: string; types: string[] }[] }[];
+    };
+    const comps = data.results?.[0]?.address_components;
+    if (data.status !== "OK" || !comps) return fallback;
+    const get = (type: string, short = false) => {
+      const c = comps.find((x) => x.types.includes(type));
+      return c ? (short ? c.short_name : c.long_name) : "";
+    };
+    const street = [get("street_number"), get("route")].filter(Boolean).join(" ");
+    return {
+      address: street || fallback.address,
+      city: get("locality") || get("sublocality") || get("postal_town"),
+      state: get("administrative_area_level_1", true),
+      zip: get("postal_code"),
+    };
+  } catch {
+    return fallback;
+  }
+}
