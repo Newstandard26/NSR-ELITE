@@ -5,6 +5,7 @@ import { handleError, json } from "@/lib/api";
 import { pushLeadToAccuLynx } from "@/lib/acculynx-push";
 import { logActivity } from "@/lib/activity";
 import { getIntegrationSettings } from "@/lib/settings";
+import { notify } from "@/lib/notify";
 
 // GET /api/leads/[id] — full lead with notes, photos, appointments.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -80,6 +81,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         lead.rep ? `Assigned to ${lead.rep.name}` : "Unassigned",
         user.name,
       );
+      // Notify the newly assigned rep (unless they assigned it to themselves).
+      if (body.repId && body.repId !== user.id) {
+        await notify(body.repId, "lead_assigned", `${user.name} assigned you a lead: ${lead.address}`, lead.id);
+      }
     }
 
     // Auto-push to AccuLynx when the lead reaches a configured trigger status

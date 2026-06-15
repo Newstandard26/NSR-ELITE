@@ -3,6 +3,7 @@ import { acculynx } from "@/lib/acculynx";
 import { logActivity } from "@/lib/activity";
 import { getIntegrationSettings } from "@/lib/settings";
 import { logSync } from "@/lib/sync-log";
+import { notify } from "@/lib/notify";
 
 export interface PushResult {
   ok: boolean;
@@ -80,6 +81,7 @@ export async function pushLeadToAccuLynx(leadId: string): Promise<PushResult> {
     acculynxJobId: job.id,
   });
   await logSync("to_acculynx", "Lead Pushed", "success", { leadId: lead.id });
+  if (lead.repId) await notify(lead.repId, "acculynx_push", `${lead.address} was pushed to AccuLynx`, lead.id);
 
   return {
     ok: true,

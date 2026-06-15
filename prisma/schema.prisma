@@ -33,6 +33,7 @@ model User {
   locations    RepLocation[]
   territories  TerritoryAssignment[]
   notes        Note[]
+  notifications Notification[]
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt
 }
@@ -178,6 +179,20 @@ model WorkspaceSettings {
   brandColor String?
   logoUrl    String?
   updatedAt  DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  type      String
+  message   String
+  leadId    String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([createdAt])
 }
 
 // CSV import history.

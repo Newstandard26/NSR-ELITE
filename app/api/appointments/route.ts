@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { acculynx } from "@/lib/acculynx";
 import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notify";
 
 // GET /api/appointments — reps see their own; managers/admins see all.
 // Filters: rep, from, to, status
@@ -77,6 +78,9 @@ export async function POST(req: Request) {
       `Appointment (${body.type.toLowerCase()}) scheduled for ${new Date(body.scheduledAt).toLocaleString()}`,
       user.name,
     );
+    if (appointment.repId !== user.id) {
+      await notify(appointment.repId, "appointment", `New appointment: ${appointment.lead.address} on ${new Date(body.scheduledAt).toLocaleString()}`, appointment.leadId);
+    }
 
     if (body.pushToAcculynx && appointment.lead.acculynxJobId) {
       try {
