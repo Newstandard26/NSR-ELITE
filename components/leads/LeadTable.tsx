@@ -23,6 +23,12 @@ const ALL_COLUMNS = [
   { key: "address", label: "Address" },
   { key: "disposition", label: "Disposition" },
   { key: "rep", label: "Rep" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  { key: "roofAge", label: "Roof Age" },
+  { key: "insurance", label: "Insurance" },
+  { key: "territory", label: "Territory" },
+  { key: "created", label: "Created" },
   { key: "acculynx", label: "AccuLynx" },
   { key: "notes", label: "Notes" },
 ] as const;
@@ -38,9 +44,12 @@ export function LeadTable() {
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [showFilters, setShowFilters] = useState(false);
   const [showCols, setShowCols] = useState(false);
-  const [filters, setFilters] = useState<{ status?: string; rep?: string; dateFrom?: string; dateTo?: string }>({});
+  const [filters, setFilters] = useState<{ status?: string; rep?: string; territory?: string; dateFrom?: string; dateTo?: string }>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [cols, setCols] = useState<Set<ColKey>>(new Set(ALL_COLUMNS.map((c) => c.key)));
+  const [cols, setCols] = useState<Set<ColKey>>(
+    new Set<ColKey>(["owner", "address", "disposition", "rep", "acculynx", "notes"]),
+  );
+  const { data: territories = [] } = useSWR<{ id: string; name: string }[]>("/api/territories");
 
   // Persist column visibility.
   useEffect(() => {
@@ -56,6 +65,7 @@ export function LeadTable() {
     if (search) qs.set("search", search);
     if (filters.status) qs.set("status", filters.status);
     if (filters.rep) qs.set("rep", filters.rep);
+    if (filters.territory) qs.set("territory", filters.territory);
     if (filters.dateFrom) qs.set("dateFrom", filters.dateFrom);
     if (filters.dateTo) qs.set("dateTo", filters.dateTo);
     return qs.toString();
@@ -103,6 +113,16 @@ export function LeadTable() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: [...selected], repId }),
+    });
+    setSelected(new Set());
+    mutate();
+  }
+
+  async function bulkDisposition(dispositionStatusId: string) {
+    await fetch("/api/leads/bulk-disposition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [...selected], dispositionStatusId }),
     });
     setSelected(new Set());
     mutate();
@@ -174,6 +194,14 @@ export function LeadTable() {
             <option value="">All reps</option>
             {reps.map((r) => <option key={r.repId} value={r.repId}>{r.name}</option>)}
           </select>
+          <select
+            value={filters.territory ?? ""}
+            onChange={(e) => { setFilters((f) => ({ ...f, territory: e.target.value || undefined })); setPage(1); }}
+            className="h-10 rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm"
+          >
+            <option value="">All territories</option>
+            {territories.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
           <input type="date" value={filters.dateFrom ?? ""} onChange={(e) => { setFilters((f) => ({ ...f, dateFrom: e.target.value || undefined })); setPage(1); }} className="h-10 rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm" />
           <input type="date" value={filters.dateTo ?? ""} onChange={(e) => { setFilters((f) => ({ ...f, dateTo: e.target.value || undefined })); setPage(1); }} className="h-10 rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm" />
         </div>
@@ -213,6 +241,14 @@ export function LeadTable() {
             <option value="__none">Unassign</option>
             {reps.map((r) => <option key={r.repId} value={r.repId}>{r.name}</option>)}
           </select>
+          <select
+            onChange={(e) => e.target.value && bulkDisposition(e.target.value)}
+            defaultValue=""
+            className="h-9 rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm"
+          >
+            <option value="" disabled>Change disposition…</option>
+            {statuses.filter((s) => s.isActive).map((s) => <option key={s.id} value={s.id}>{s.icon} {s.label}</option>)}
+          </select>
           <Button size="sm" variant="danger" onClick={bulkDelete}>
             <Trash2 className="h-4 w-4" /> Delete
           </Button>
@@ -239,6 +275,12 @@ export function LeadTable() {
               {show("address") && <SortHead col="city" label="Address" />}
               {show("disposition") && <th className="p-3">Disposition</th>}
               {show("rep") && <th className="p-3">Rep</th>}
+              {show("phone") && <th className="p-3">Phone</th>}
+              {show("email") && <th className="p-3">Email</th>}
+              {show("roofAge") && <th className="p-3">Roof Age</th>}
+              {show("insurance") && <th className="p-3">Insurance</th>}
+              {show("territory") && <th className="p-3">Territory</th>}
+              {show("created") && <SortHead col="createdAt" label="Created" />}
               {show("acculynx") && <th className="p-3">AccuLynx</th>}
               {show("notes") && <th className="p-3">Notes</th>}
             </tr>
@@ -272,6 +314,12 @@ export function LeadTable() {
                   </td>
                 )}
                 {show("rep") && <td className="p-3 text-zinc-400">{l.rep?.name || "—"}</td>}
+                {show("phone") && <td className="p-3 text-zinc-400">{l.phone || "—"}</td>}
+                {show("email") && <td className="p-3 text-zinc-400">{l.email || "—"}</td>}
+                {show("roofAge") && <td className="p-3 text-zinc-400">{l.roofAge ?? "—"}</td>}
+                {show("insurance") && <td className="p-3 text-zinc-400">{l.insuranceCompany || "—"}</td>}
+                {show("territory") && <td className="p-3 text-zinc-400">{l.territory?.name || "—"}</td>}
+                {show("created") && <td className="p-3 text-zinc-400">{l.createdAt ? new Date(l.createdAt).toLocaleDateString() : "—"}</td>}
                 {show("acculynx") && (
                   <td className="p-3 text-zinc-400">{l.acculynxJobId ? l.acculynxStatus || "Linked" : "—"}</td>
                 )}
@@ -280,7 +328,7 @@ export function LeadTable() {
             ))}
             {leads.length === 0 && (
               <tr>
-                <td colSpan={ALL_COLUMNS.length + 1} className="p-6 text-center text-zinc-500">
+                <td colSpan={cols.size + 1} className="p-6 text-center text-zinc-500">
                   No leads match. Adjust filters, import a CSV, or add a lead.
                 </td>
               </tr>

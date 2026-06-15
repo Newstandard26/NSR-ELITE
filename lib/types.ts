@@ -46,6 +46,8 @@ export interface LeadDTO {
   territory: { id: string; name: string } | null;
   acculynxJobId: string | null;
   acculynxStatus: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   _count?: { notes: number; photos: number };
 }
 
