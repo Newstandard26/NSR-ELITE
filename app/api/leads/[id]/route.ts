@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser, requireRole } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
+import { pushLeadToAccuLynx } from "@/lib/acculynx-push";
 
 // GET /api/leads/[id] — full lead with notes, photos, appointments.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -57,6 +58,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         rep: { select: { id: true, name: true } },
       },
     });
+
+    // Auto-push to AccuLynx when the lead reaches a "Customer" pipeline stage
+    // and isn't already linked. Best effort — never fail the update on this.
+    if (
+      body.dispositionStatusId &&
+      !lead.acculynxJobId &&
+      lead.dispositionStatus?.pipelineStage === "Customer" &&
+      process.env.ACCULYNX_API_KEY
+    ) {
+      try {
+        await pushLeadToAccuLynx(lead.id);
+      } catch (e) {
+        console.error("Auto-push to AccuLynx failed:", (e as Error).message);
+      }
+    }
+
     return json(lead);
   } catch (err) {
     return handleError(err);
