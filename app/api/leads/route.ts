@@ -134,7 +134,9 @@ export async function POST(req: Request) {
         insuranceCompany: body.insuranceCompany,
         dispositionStatusId,
         dispositionAt: dispositionStatusId ? new Date() : undefined,
-        repId: body.repId ?? (user.role === "REP" ? user.id : undefined),
+        // Default the lead to whoever entered it (any role); managers can pick a
+        // different rep explicitly via the form, or reassign later.
+        repId: body.repId ?? user.id,
         territoryId: body.territoryId,
       },
       include: { dispositionStatus: true, rep: { select: { id: true, name: true } } },

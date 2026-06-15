@@ -37,8 +37,10 @@ export async function computeRepStats(): Promise<RepStats[]> {
   const week = startOfWeek();
   const month = startOfMonth();
 
+  // Everyone who can own/work a lead — reps, plus managers and admins who also
+  // canvass — so they're all selectable when assigning a logged knock.
   const reps = await prisma.user.findMany({
-    where: { role: { in: ["REP", "MANAGER"] }, isActive: true },
+    where: { role: { in: ["REP", "MANAGER", "ADMIN"] }, isActive: true },
     select: { id: true, name: true },
   });
 
