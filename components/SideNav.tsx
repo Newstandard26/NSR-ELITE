@@ -59,7 +59,9 @@ export function SideNav() {
         })}
       </nav>
       <div className="border-t border-zinc-800 pt-2">
-        <p className="px-3 text-xs text-zinc-400">{session?.user?.name}</p>
+        <Link href="/profile" className="block rounded-xl px-3 py-1 text-xs text-zinc-400 hover:bg-zinc-900 hover:text-white">
+          {session?.user?.name} · Profile
+        </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900"
