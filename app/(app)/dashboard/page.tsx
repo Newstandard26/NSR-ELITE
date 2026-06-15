@@ -14,6 +14,8 @@ interface DashboardData {
     conversionPct: number;
   };
   reps: RepStatsDTO[];
+  pipeline: { stage: string; count: number; color: string }[];
+  recentActivity: { id: string; type: string; description: string; actor: string | null; createdAt: string; lead: string }[];
 }
 
 export default function DashboardPage() {
@@ -40,6 +42,56 @@ export default function DashboardPage() {
             <CardTitle className="mt-1 text-2xl">{card.value ?? "—"}</CardTitle>
           </Card>
         ))}
+      </div>
+
+      {/* Pipeline funnel + recent activity */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="space-y-3">
+          <CardLabel>Pipeline</CardLabel>
+          {(() => {
+            const pipeline = data?.pipeline ?? [];
+            const max = Math.max(1, ...pipeline.map((p) => p.count));
+            return pipeline.length === 0 ? (
+              <p className="text-sm text-zinc-500">No leads yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {pipeline.map((p) => (
+                  <div key={p.stage}>
+                    <div className="flex justify-between text-xs text-zinc-400">
+                      <span>{p.stage}</span>
+                      <span>{p.count}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-zinc-800">
+                      <div
+                        className="h-2 rounded-full"
+                        style={{ width: `${(p.count / max) * 100}%`, backgroundColor: p.color }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </Card>
+
+        <Card className="space-y-2">
+          <CardLabel>Recent activity</CardLabel>
+          <ul className="space-y-2">
+            {(data?.recentActivity ?? []).slice(0, 12).map((a) => (
+              <li key={a.id} className="text-sm">
+                <span className="text-zinc-300">{a.description}</span>{" "}
+                <span className="text-zinc-500">— {a.lead}</span>
+                <div className="text-xs text-zinc-600">
+                  {a.actor ? `${a.actor} · ` : ""}
+                  {new Date(a.createdAt).toLocaleString()}
+                </div>
+              </li>
+            ))}
+            {(data?.recentActivity ?? []).length === 0 && (
+              <li className="text-sm text-zinc-500">No recent activity.</li>
+            )}
+          </ul>
+        </Card>
       </div>
 
       <div>
