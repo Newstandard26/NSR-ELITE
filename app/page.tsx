@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// Reps land on the map; everyone enters through it.
+// Everyone lands on the role-aware dashboard.
 export default function Home() {
-  redirect("/map");
+  redirect("/dashboard");
 }

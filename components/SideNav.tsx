@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
 
 const baseItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/map", label: "Map", icon: Map },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/territories", label: "Territories", icon: Landmark },
@@ -17,7 +18,6 @@ const baseItems = [
 ];
 
 const managerItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/settings/pins", label: "Settings", icon: Settings },
 ];
 

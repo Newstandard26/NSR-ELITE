@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Map, Users, Calendar, Trophy, User } from "lucide-react";
+import { LayoutDashboard, Map, Users, Calendar, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/map", label: "Map", icon: Map },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/appointments", label: "Appts", icon: Calendar },
-  { href: "/leaderboard", label: "Ranks", icon: Trophy },
   { href: "/profile", label: "Profile", icon: User },
 ];
 

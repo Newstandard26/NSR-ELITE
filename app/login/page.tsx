@@ -20,7 +20,7 @@ export default function LoginPage() {
     const res = await signIn("credentials", { email, password, redirect: false });
     setBusy(false);
     if (res?.error) setError("Invalid email or password");
-    else router.push("/map");
+    else router.push("/dashboard");
   }
 
   return (
