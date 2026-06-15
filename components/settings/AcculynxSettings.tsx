@@ -21,6 +21,7 @@ export function AcculynxSettings() {
   const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
   const { data: leadSources = [] } = useSWR<NamedId[]>("/api/acculynx/lead-sources");
   const { data: acculynxUsers = [] } = useSWR<NamedId[]>("/api/acculynx/users");
+  const { data: milestones = [] } = useSWR<NamedId[]>("/api/acculynx/milestones");
   const { data: users = [], mutate: mutateUsers } = useSWR<UserRow[]>("/api/users");
 
   const [ping, setPing] = useState<"idle" | "testing" | "ok" | "fail">("idle");
@@ -57,6 +58,14 @@ export function AcculynxSettings() {
     const set = new Set(settings.triggerStatusIds);
     set.has(id) ? set.delete(id) : set.add(id);
     save({ triggerStatusIds: [...set] });
+  }
+
+  function mapMilestone(milestoneId: string, dispositionId: string) {
+    if (!settings) return;
+    const next = { ...settings.milestoneMap };
+    if (dispositionId) next[milestoneId] = dispositionId;
+    else delete next[milestoneId];
+    save({ milestoneMap: next });
   }
 
   const webhookUrl = origin ? `${origin}/api/webhooks/acculynx?secret=YOUR_SECRET` : "";
@@ -127,6 +136,41 @@ export function AcculynxSettings() {
           Register this in AccuLynx&apos;s webhook subscriptions. Replace YOUR_SECRET with the value of
           the ACCULYNX_WEBHOOK_SECRET environment variable.
         </p>
+      </Card>
+
+      {/* Milestone -> disposition map */}
+      <Card className="space-y-2">
+        <CardTitle>Milestone → disposition</CardTitle>
+        <p className="text-xs text-zinc-500">
+          When AccuLynx fires a milestone change, update the lead to the mapped disposition.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase text-zinc-400">
+              <tr><th className="p-2">AccuLynx milestone</th><th className="p-2">NSR disposition</th></tr>
+            </thead>
+            <tbody>
+              {milestones.map((m) => (
+                <tr key={m.id} className="border-t border-zinc-800">
+                  <td className="p-2">{m.name}</td>
+                  <td className="p-2">
+                    <select
+                      value={settings?.milestoneMap[m.id] ?? ""}
+                      onChange={(e) => mapMilestone(m.id, e.target.value)}
+                      className="h-9 rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm"
+                    >
+                      <option value="">No sync</option>
+                      {statuses.map((s) => <option key={s.id} value={s.id}>{s.icon} {s.label}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+              {milestones.length === 0 && (
+                <tr><td colSpan={2} className="p-2 text-xs text-zinc-500">No milestones loaded.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       {/* Rep mapping */}

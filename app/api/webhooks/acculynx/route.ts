@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { handleError, json } from "@/lib/api";
 import { logActivity } from "@/lib/activity";
+import { getIntegrationSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
       typeof payload.milestone === "string"
         ? payload.milestone
         : payload.milestone?.name || payload.status;
+    const milestoneId =
+      typeof payload.milestone === "object" ? payload.milestone?.id : undefined;
 
     if (!jobId) return json({ ok: true, matched: false });
 
@@ -43,14 +46,23 @@ export async function POST(req: Request) {
     }
 
     if (milestoneName && milestoneName !== lead.acculynxStatus) {
+      // Apply the configured milestone -> disposition mapping, if any.
+      const settings = await getIntegrationSettings();
+      const mappedDispositionId = milestoneId ? settings.milestoneMap[milestoneId] : undefined;
+
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { acculynxStatus: milestoneName },
+        data: {
+          acculynxStatus: milestoneName,
+          ...(mappedDispositionId
+            ? { dispositionStatusId: mappedDispositionId, dispositionAt: new Date() }
+            : {}),
+        },
       });
       await logActivity(
         lead.id,
         "acculynx_milestone",
-        `AccuLynx milestone changed to ${milestoneName}`,
+        `AccuLynx milestone changed to ${milestoneName}${mappedDispositionId ? " — disposition updated" : ""}`,
         "AccuLynx",
         { topic: payload.topic, jobId },
       );
