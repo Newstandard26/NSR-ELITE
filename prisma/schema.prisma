@@ -25,7 +25,7 @@ model User {
   role         Role                  @default(REP)
   acculynxId   String?
   isActive     Boolean               @default(true)
-  // Timestamp of the user's most recent successful login.
+  // Timestamp of the user's most recent app activity (login or usage ping).
   lastLoginAt  DateTime?
   // Manager-set targets for gamification.
   dailyTarget  Int?
