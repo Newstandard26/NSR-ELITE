@@ -1,6 +1,5 @@
 "use client";
 
-import { use } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { ArrowLeft } from "lucide-react";
@@ -21,8 +20,8 @@ interface Detail {
   };
 }
 
-export default function TerritoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function TerritoryDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const { data } = useSWR<Detail>(`/api/territories/${id}`);
 
   if (!data) return <div className="p-6 text-zinc-500">Loading…</div>;

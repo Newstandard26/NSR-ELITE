@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -27,8 +27,8 @@ const TYPE_LABEL: Record<string, string> = {
   lead_imported: "Imported",
 };
 
-export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function LeadDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const { data: lead, mutate } = useSWR<LeadDetail>(`/api/leads/${id}`);
   const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
