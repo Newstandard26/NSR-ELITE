@@ -101,14 +101,34 @@ model Lead {
   territory           Territory?         @relation(fields: [territoryId], references: [id])
   territoryId         String?
   acculynxJobId       String?
+  acculynxContactId   String?
+  acculynxJobUrl      String?
   acculynxStatus      String?
+  acculynxPushedAt    DateTime?
   appointments        Appointment[]
+  activities          LeadActivity[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
   @@index([dispositionStatusId])
   @@index([repId])
   @@index([territoryId])
+}
+
+model LeadActivity {
+  id          String   @id @default(cuid())
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId      String
+  // lead_created, status_changed, note_added, rep_changed, acculynx_push,
+  // acculynx_milestone, lead_imported
+  type        String
+  description String
+  actor       String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
 }
 
 model Note {

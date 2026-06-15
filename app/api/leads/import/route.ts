@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { geocodeAddress, composeAddress } from "@/lib/geocode";
+import { logActivity } from "@/lib/activity";
 
 interface CsvRow {
   name?: string;
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
             dispositionAt: defaultStatus ? new Date() : undefined,
           },
         });
+        await logActivity(lead.id, "lead_imported", "Imported from CSV", user.name || "Import");
         if (row.notes) {
           await prisma.note.create({
             data: { leadId: lead.id, content: row.notes, author: user.name || "Import" },

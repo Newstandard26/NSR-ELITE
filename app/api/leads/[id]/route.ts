@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUser, requireRole } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { pushLeadToAccuLynx } from "@/lib/acculynx-push";
+import { logActivity } from "@/lib/activity";
 
 // GET /api/leads/[id] — full lead with notes, photos, appointments.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -17,6 +18,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         notes: { orderBy: { createdAt: "desc" } },
         photos: { orderBy: { createdAt: "desc" } },
         appointments: { orderBy: { scheduledAt: "asc" } },
+        activities: { orderBy: { createdAt: "desc" }, take: 100 },
       },
     });
     if (!lead) return json({ error: "Not found" }, 404);
@@ -41,7 +43,7 @@ const patchSchema = z.object({
 // PATCH /api/leads/[id] — update lead, stamps dispositionAt on status change.
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
-    await requireUser();
+    const user = await requireUser();
     const body = patchSchema.parse(await req.json());
 
     const data: Record<string, unknown> = { ...body };
@@ -58,6 +60,24 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         rep: { select: { id: true, name: true } },
       },
     });
+
+    // Activity log.
+    if (body.dispositionStatusId !== undefined) {
+      await logActivity(
+        lead.id,
+        "status_changed",
+        `Status changed to ${lead.dispositionStatus?.label ?? "none"}`,
+        user.name,
+      );
+    }
+    if (body.repId !== undefined) {
+      await logActivity(
+        lead.id,
+        "rep_changed",
+        lead.rep ? `Assigned to ${lead.rep.name}` : "Unassigned",
+        user.name,
+      );
+    }
 
     // Auto-push to AccuLynx when the lead reaches a "Customer" pipeline stage
     // and isn't already linked. Best effort — never fail the update on this.

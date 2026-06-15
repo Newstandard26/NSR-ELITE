@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { acculynx } from "@/lib/acculynx";
+import { logActivity } from "@/lib/activity";
 
 const schema = z.object({
   content: z.string().min(1),
@@ -27,6 +28,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         authorUserId: user.id,
       },
     });
+
+    await logActivity(lead.id, "note_added", body.content, user.name || user.email);
 
     if (body.pushToAcculynx && lead.acculynxJobId) {
       try {

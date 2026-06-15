@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { acculynx } from "@/lib/acculynx";
+import { logActivity } from "@/lib/activity";
 
 export interface PushResult {
   ok: boolean;
@@ -50,14 +51,23 @@ export async function pushLeadToAccuLynx(leadId: string): Promise<PushResult> {
   const converted = await prisma.dispositionStatus.findFirst({
     where: { label: { contains: "Converted", mode: "insensitive" } },
   });
+  const contactId = (job as { contactId?: string }).contactId;
+  const jobUrl = (job as { _link?: string })._link;
   await prisma.lead.update({
     where: { id: lead.id },
     data: {
       acculynxJobId: job.id,
+      acculynxContactId: contactId,
+      acculynxJobUrl: jobUrl,
       acculynxStatus: job.milestone || "Lead",
+      acculynxPushedAt: new Date(),
       dispositionStatusId: converted?.id ?? lead.dispositionStatusId,
       dispositionAt: new Date(),
     },
+  });
+
+  await logActivity(lead.id, "acculynx_push", `Pushed to AccuLynx (job ${job.id})`, "System", {
+    acculynxJobId: job.id,
   });
 
   return {

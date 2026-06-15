@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { geocodeAddress, composeAddress } from "@/lib/geocode";
+import { logActivity } from "@/lib/activity";
 
 // GET /api/leads — filters: status, rep, territory, dateFrom, dateTo, search
 export async function GET(req: Request) {
@@ -137,6 +138,12 @@ export async function POST(req: Request) {
       },
       include: { dispositionStatus: true, rep: { select: { id: true, name: true } } },
     });
+    await logActivity(
+      lead.id,
+      "lead_created",
+      `Lead created${lead.rep ? ` and assigned to ${lead.rep.name}` : ""}`,
+      user.name,
+    );
     return json(lead, 201);
   } catch (err) {
     return handleError(err);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -154,9 +155,17 @@ export function LeadCardDrawer({
               {lead?.address}, {lead?.city} {lead?.state} {lead?.zip}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 hover:bg-zinc-800" aria-label="Close">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/leads/${leadId}`}
+              className="rounded-lg px-2 py-1 text-xs text-nsr-blue hover:bg-zinc-800"
+            >
+              Full page
+            </Link>
+            <button onClick={onClose} className="rounded-full p-2 hover:bg-zinc-800" aria-label="Close">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {!lead ? (
