@@ -109,6 +109,10 @@ model Lead {
   acculynxJobUrl      String?
   acculynxStatus      String?
   acculynxPushedAt    DateTime?
+  // Property data enrichment (ATTOM etc.), cached per address in PropertyRecord.
+  propertyRecord      PropertyRecord?    @relation(fields: [propertyRecordId], references: [id])
+  propertyRecordId    String?
+  enrichedAt          DateTime?
   appointments        Appointment[]
   activities          LeadActivity[]
   createdAt           DateTime           @default(now())
@@ -117,6 +121,7 @@ model Lead {
   @@index([dispositionStatusId])
   @@index([repId])
   @@index([territoryId])
+  @@index([propertyRecordId])
 }
 
 model LeadActivity {
@@ -234,6 +239,44 @@ model IntegrationSettings {
   // Map of AccuLynx milestone name -> disposition status id.
   milestoneMap         Json?
   updatedAt            DateTime @updatedAt
+}
+
+// Cached property-data enrichment, keyed by normalized address so multiple
+// leads at the same parcel (and re-taps) reuse one paid lookup. `raw` keeps the
+// full provider payload; the parsed columns power the UI.
+model PropertyRecord {
+  id                 String    @id @default(cuid())
+  // Lowercased "address, city, state zip" used as the cache key.
+  normalizedAddress  String    @unique
+  source             String    // mock | attom
+  // Ownership
+  ownerName          String?
+  ownerOccupied      Boolean?
+  mailingAddress     String?
+  // Characteristics
+  yearBuilt          Int?
+  sqft               Int?
+  beds               Int?
+  baths              Float?
+  lotSizeSqft        Int?
+  // Value & sale
+  lastSalePrice      Int?
+  lastSaleDate       DateTime?
+  assessedValue      Int?
+  avmValue           Int?
+  avmLow             Int?
+  avmHigh            Int?
+  estimatedEquity    Int?
+  mortgageBalanceEst Int?
+  // Soft qualifier (modeled marketing data — NOT an FCRA credit report)
+  estimatedIncomeBand String?
+  // Contact append (skip trace). phones: [{ number, type, dnc }]; emails: string[]
+  phones             Json?
+  emails             Json?
+  raw                Json?
+  fetchedAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  leads              Lead[]
 }
 
 // One row per successful login, for usage/adoption analytics.

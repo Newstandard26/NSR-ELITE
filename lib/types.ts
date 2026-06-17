@@ -46,9 +46,42 @@ export interface LeadDTO {
   territory: { id: string; name: string } | null;
   acculynxJobId: string | null;
   acculynxStatus: string | null;
+  enrichedAt?: string | null;
+  propertyRecord?: PropertyRecordDTO | null;
   createdAt?: string;
   updatedAt?: string;
   _count?: { notes: number; photos: number };
+}
+
+export interface PropertyPhoneDTO {
+  number: string;
+  type?: string;
+  dnc?: boolean;
+}
+
+export interface PropertyRecordDTO {
+  id: string;
+  source: string;
+  ownerName: string | null;
+  ownerOccupied: boolean | null;
+  mailingAddress: string | null;
+  yearBuilt: number | null;
+  sqft: number | null;
+  beds: number | null;
+  baths: number | null;
+  lotSizeSqft: number | null;
+  lastSalePrice: number | null;
+  lastSaleDate: string | null;
+  assessedValue: number | null;
+  avmValue: number | null;
+  avmLow: number | null;
+  avmHigh: number | null;
+  estimatedEquity: number | null;
+  mortgageBalanceEst: number | null;
+  estimatedIncomeBand: string | null;
+  phones: PropertyPhoneDTO[] | null;
+  emails: string[] | null;
+  fetchedAt: string;
 }
 
 export interface NoteDTO {

@@ -21,6 +21,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         photos: { orderBy: { createdAt: "desc" } },
         appointments: { orderBy: { scheduledAt: "asc" } },
         activities: { orderBy: { createdAt: "desc" }, take: 100 },
+        propertyRecord: true,
       },
     });
     if (!lead) return json({ error: "Not found" }, 404);
