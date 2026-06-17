@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea, Input } from "@/components/ui/input";
 import { DispositionBadge } from "@/components/ui/badge";
 import { DispositionSelector } from "./DispositionSelector";
+import { PropertyDataPanel } from "./PropertyDataPanel";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import type { DispositionStatusDTO, LeadDTO, NoteDTO, RepStatsDTO } from "@/lib/types";
 
@@ -36,6 +37,7 @@ export function LeadCardDrawer({
   const [apptOpen, setApptOpen] = useState(false);
   const [apptAt, setApptAt] = useState<Date | null>(null);
   const [apptType, setApptType] = useState("INSPECTION");
+  const propertyEnrichEnabled = process.env.NEXT_PUBLIC_PROPERTY_ENRICHMENT_ENABLED === "true";
 
   async function updateDisposition(dispositionStatusId: string) {
     setBusy("disposition");
@@ -104,6 +106,18 @@ export function LeadCardDrawer({
           msg += "\n\n⚠️ This lead has no assigned rep, so AccuLynx is unassigned. Pick an 'Assigned rep' first.";
       }
       alert(msg);
+    }
+    await mutate();
+    onChanged();
+    setBusy(null);
+  }
+
+  async function pullPropertyData() {
+    setBusy("property");
+    const res = await fetch(`/api/leads/${leadId}/enrich`, { method: "POST" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "Failed to pull property data");
     }
     await mutate();
     onChanged();
@@ -201,6 +215,15 @@ export function LeadCardDrawer({
                 </span>
               )}
             </div>
+
+            {propertyEnrichEnabled && (
+              <PropertyDataPanel
+                record={lead.propertyRecord}
+                enrichedAt={lead.enrichedAt}
+                onPull={pullPropertyData}
+                busy={busy === "property"}
+              />
+            )}
 
             <DispositionSelector
               statuses={statuses}
