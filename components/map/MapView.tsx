@@ -8,6 +8,7 @@ import { LocateFixed, Flame, Filter, Plus, Search, MapPin } from "lucide-react";
 import { LeadCardDrawer } from "./LeadCardDrawer";
 import { MapFilterBar, type MapFilters } from "./MapFilterBar";
 import { LeadForm } from "@/components/leads/LeadForm";
+import { getCurrentPosition } from "@/lib/native";
 import type { DispositionStatusDTO, LeadDTO } from "@/lib/types";
 
 interface TerritoryDTO {
@@ -264,33 +265,31 @@ export function MapView() {
     searchMarkerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([d.lng, d.lat]).addTo(map);
   }
 
-  // --- GPS: center on rep location ---
-  function showMyLocation() {
-    if (!navigator.geolocation) return alert("Geolocation not available");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const map = mapRef.current;
-        if (!map) return;
-        map.flyTo({ center: [longitude, latitude], zoom: 15 });
-        if (userMarkerRef.current) userMarkerRef.current.remove();
-        const el = document.createElement("div");
-        el.style.cssText =
-          "width:18px;height:18px;border-radius:50%;background:#51C5F4;border:3px solid #fff;box-shadow:0 0 0 6px rgba(81,197,244,.3);";
-        userMarkerRef.current = new mapboxgl.Marker({ element: el })
-          .setLngLat([longitude, latitude])
-          .addTo(map);
+  // --- GPS: center on rep location (native plugin on device, browser on web) ---
+  async function showMyLocation() {
+    let latitude: number, longitude: number;
+    try {
+      ({ lat: latitude, lng: longitude } = await getCurrentPosition());
+    } catch {
+      return alert("Could not get your location");
+    }
+    const map = mapRef.current;
+    if (!map) return;
+    map.flyTo({ center: [longitude, latitude], zoom: 15 });
+    if (userMarkerRef.current) userMarkerRef.current.remove();
+    const el = document.createElement("div");
+    el.style.cssText =
+      "width:18px;height:18px;border-radius:50%;background:#51C5F4;border:3px solid #fff;box-shadow:0 0 0 6px rgba(81,197,244,.3);";
+    userMarkerRef.current = new mapboxgl.Marker({ element: el })
+      .setLngLat([longitude, latitude])
+      .addTo(map);
 
-        // Log the ping (best effort).
-        fetch("/api/reps/location", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat: latitude, lng: longitude }),
-        }).catch(() => {});
-      },
-      () => alert("Could not get your location"),
-      { enableHighAccuracy: true },
-    );
+    // Log the ping (best effort).
+    fetch("/api/reps/location", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lat: latitude, lng: longitude }),
+    }).catch(() => {});
   }
 
   return (
