@@ -14,12 +14,22 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "cap:sync": "cap sync",
+    "cap:add:ios": "cap add ios",
+    "cap:add:android": "cap add android",
+    "cap:ios": "cap open ios",
+    "cap:android": "cap open android",
     "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/ios": "^8.4.0",
     "@mapbox/mapbox-gl-draw": "^1.5.0",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-dialog": "^1.1.4",
