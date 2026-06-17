@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Check, Plus, KeyRound, X, Copy, Trash2 } from "lucide-react";
+import { Check, Plus, KeyRound, X, Copy, Trash2, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -25,8 +25,23 @@ export function UsersManager() {
   const [drafts, setDrafts] = useState<Record<string, Partial<UserRow>>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
   // Shows a freshly-set temp password to copy/share.
   const [tempCred, setTempCred] = useState<{ email: string; password: string } | null>(null);
+  // Invite result: a confirmation, or a copyable link when email is mocked.
+  const [inviteNotice, setInviteNotice] = useState<{ email: string; mocked: boolean; link?: string } | null>(null);
+
+  async function invite(user: UserRow) {
+    setInvitingId(user.id);
+    const res = await fetch(`/api/users/${user.id}/invite`, { method: "POST" });
+    setInvitingId(null);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(body.error || "Failed to send invite");
+      return;
+    }
+    setInviteNotice({ email: user.email, mocked: !!body.mocked, link: body.link });
+  }
 
   function edit(id: string, patch: Partial<UserRow>) {
     setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } }));
@@ -94,10 +109,38 @@ export function UsersManager() {
         <AddUserModal
           onClose={() => setAdding(false)}
           onCreated={(cred) => {
-            setTempCred(cred);
+            if (cred) setTempCred(cred);
+            mutate();
+          }}
+          onInvited={(notice) => {
+            setInviteNotice(notice);
             mutate();
           }}
         />
+      )}
+
+      {inviteNotice && (
+        <div className="flex items-start justify-between gap-2 rounded-2xl border border-nsr-blue/40 bg-zinc-900 p-3 text-sm">
+          <div>
+            {inviteNotice.mocked ? (
+              <>
+                <p className="font-semibold">Email isn&apos;t configured — copy this invite link:</p>
+                <p className="break-all font-mono text-xs text-zinc-300">{inviteNotice.link}</p>
+              </>
+            ) : (
+              <p className="font-semibold">Invite sent to {inviteNotice.email} ✅</p>
+            )}
+            <p className="text-xs text-zinc-500">The link lets them set their own password (expires in 72h).</p>
+          </div>
+          <div className="flex items-center gap-1">
+            {inviteNotice.mocked && inviteNotice.link && (
+              <Button size="sm" variant="secondary" onClick={() => navigator.clipboard.writeText(inviteNotice.link!)}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            )}
+            <button onClick={() => setInviteNotice(null)} className="p-1 text-zinc-400 hover:text-white"><X className="h-4 w-4" /></button>
+          </div>
+        </div>
       )}
 
       {tempCred && (
@@ -146,6 +189,9 @@ export function UsersManager() {
                   </td>
                   <td className="p-2 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => invite(u)} disabled={invitingId === u.id} title="Send invite email" className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white disabled:opacity-50">
+                        <Mail className="h-4 w-4" />
+                      </button>
                       <button onClick={() => resetPassword(u)} title="Reset password" className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white">
                         <KeyRound className="h-4 w-4" />
                       </button>
@@ -167,11 +213,20 @@ export function UsersManager() {
   );
 }
 
-function AddUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: (cred: { email: string; password: string }) => void }) {
+function AddUserModal({
+  onClose,
+  onCreated,
+  onInvited,
+}: {
+  onClose: () => void;
+  onCreated: (cred: { email: string; password: string } | null) => void;
+  onInvited: (notice: { email: string; mocked: boolean; link?: string }) => void;
+}) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("REP");
   const [password, setPassword] = useState(genPassword());
+  const [sendInviteEmail, setSendInviteEmail] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -187,13 +242,30 @@ function AddUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, role, password }),
     });
-    setBusy(false);
     if (!res.ok) {
+      setBusy(false);
       const e = await res.json().catch(() => ({}));
       setError(e.error === "Already exists" ? "A user with that email already exists." : e.error || "Failed to create user.");
       return;
     }
-    onCreated({ email: email.toLowerCase(), password });
+    const created = await res.json().catch(() => ({}));
+
+    if (sendInviteEmail && created.id) {
+      // The user will set their own password via the invite link; the temp
+      // password above just satisfies account creation and isn't shared.
+      const inv = await fetch(`/api/users/${created.id}/invite`, { method: "POST" });
+      const body = await inv.json().catch(() => ({}));
+      setBusy(false);
+      if (inv.ok) {
+        onInvited({ email: email.toLowerCase(), mocked: !!body.mocked, link: body.link });
+      } else {
+        // Account was created; just surface the temp password as a fallback.
+        onCreated({ email: email.toLowerCase(), password });
+      }
+    } else {
+      setBusy(false);
+      onCreated({ email: email.toLowerCase(), password });
+    }
     onClose();
   }
 
@@ -212,16 +284,30 @@ function AddUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
             <option value="REP">Rep</option><option value="MANAGER">Manager</option><option value="ADMIN">Admin</option>
           </select>
         </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-zinc-400">Temporary password</label>
-          <div className="flex gap-2">
-            <Input value={password} onChange={(e) => setPassword(e.target.value)} className="font-mono" />
-            <Button variant="secondary" size="sm" onClick={() => setPassword(genPassword())}>New</Button>
+        <label className="flex items-start gap-2 rounded-xl border border-zinc-800 p-3 text-sm">
+          <input type="checkbox" checked={sendInviteEmail} onChange={(e) => setSendInviteEmail(e.target.checked)} className="mt-0.5 h-4 w-4" />
+          <span>
+            Email a set-password invite
+            <span className="block text-xs text-zinc-500">
+              Sends a secure link so they set their own password. Use their AccuLynx email so leads auto-assign.
+            </span>
+          </span>
+        </label>
+
+        {!sendInviteEmail && (
+          <div>
+            <label className="text-xs uppercase tracking-wide text-zinc-400">Temporary password</label>
+            <div className="flex gap-2">
+              <Input value={password} onChange={(e) => setPassword(e.target.value)} className="font-mono" />
+              <Button variant="secondary" size="sm" onClick={() => setPassword(genPassword())}>New</Button>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">You&apos;ll share this with the user; they change it after signing in.</p>
           </div>
-          <p className="mt-1 text-xs text-zinc-500">You&apos;ll share this with the user; they change it after signing in.</p>
-        </div>
+        )}
         {error && <p className="text-sm text-red-400">{error}</p>}
-        <Button className="w-full" onClick={submit} disabled={busy}>{busy ? "Creating…" : "Create User"}</Button>
+        <Button className="w-full" onClick={submit} disabled={busy}>
+          {busy ? "Creating…" : sendInviteEmail ? "Create & send invite" : "Create User"}
+        </Button>
       </div>
     </div>
   );

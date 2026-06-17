@@ -37,6 +37,7 @@ model User {
   notes        Note[]
   notifications Notification[]
   loginEvents  LoginEvent[]
+  inviteTokens InviteToken[]
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt
 }
@@ -277,6 +278,19 @@ model PropertyRecord {
   fetchedAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   leads              Lead[]
+}
+
+// Single-use, expiring token for the "set your password" invite link.
+model InviteToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // One row per successful login, for usage/adoption analytics.
