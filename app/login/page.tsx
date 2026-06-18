@@ -49,6 +49,11 @@ export default function LoginPage() {
         <Button type="submit" className="w-full" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </Button>
+        <p className="text-center text-xs text-zinc-500">
+          <a href="/privacy" className="hover:text-zinc-300">Privacy Policy</a>
+          {" · "}
+          <a href="/terms" className="hover:text-zinc-300">Terms of Use</a>
+        </p>
       </form>
     </div>
   );
