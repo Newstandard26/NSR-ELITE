@@ -127,16 +127,16 @@ export function MapView() {
 
       for (const lead of leads) {
         if (!lead.lat && !lead.lng) continue; // skip un-geocoded
-        const color = lead.dispositionStatus?.color || "#3B82F6";
         const icon = lead.dispositionStatus?.icon || "🔵";
-        const abbr = lead.dispositionStatus?.abbreviation;
 
-        const el = document.createElement("button");
+        // Simple round emoji marker (the disposition's colored circle). A <div>
+        // (not a <button>) so it stays perfectly round on mobile Safari.
+        const el = document.createElement("div");
         el.className = "nsr-pin";
-        // Show the abbreviation when set; fall back to the emoji icon.
-        const fontSize = abbr ? "8px" : "15px";
-        el.style.cssText = `box-sizing:border-box;padding:0;margin:0;appearance:none;-webkit-appearance:none;width:30px;height:30px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fontSize};font-weight:700;line-height:1;text-align:center;color:#fff;background:${color};box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:pointer;`;
-        el.textContent = abbr || icon;
+        el.textContent = icon;
+        el.style.cssText =
+          "font-size:28px;line-height:1;cursor:pointer;user-select:none;-webkit-user-select:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));";
+        el.setAttribute("role", "button");
         el.setAttribute("aria-label", lead.ownerName || lead.address);
         el.addEventListener("click", (e) => {
           e.stopPropagation();
