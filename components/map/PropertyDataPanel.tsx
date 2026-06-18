@@ -51,6 +51,11 @@ export function PropertyDataPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <Home className="h-4 w-4 text-nsr-blue" /> Property data
+          {record.source === "mock" && (
+            <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-400">
+              Sample data
+            </span>
+          )}
         </div>
         <button
           onClick={onPull}

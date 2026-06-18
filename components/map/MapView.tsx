@@ -60,6 +60,7 @@ export function MapView() {
 
   // Refs so the one-time map click handler always sees current values.
   const [dropMode, setDropMode] = useState(false);
+  const [locConsentOpen, setLocConsentOpen] = useState(false);
   const dropModeRef = useRef(false);
   const refetchRef = useRef(refetchLeads);
   refetchRef.current = refetchLeads;
@@ -266,7 +267,22 @@ export function MapView() {
   }
 
   // --- GPS: center on rep location (native plugin on device, browser on web) ---
+  // Show a prominent disclosure + consent before the first location request.
   async function showMyLocation() {
+    if (typeof window !== "undefined" && localStorage.getItem("nsr_loc_consent") !== "1") {
+      setLocConsentOpen(true);
+      return;
+    }
+    await runLocation();
+  }
+
+  function grantLocationConsent() {
+    localStorage.setItem("nsr_loc_consent", "1");
+    setLocConsentOpen(false);
+    runLocation();
+  }
+
+  async function runLocation() {
     let latitude: number, longitude: number;
     try {
       ({ lat: latitude, lng: longitude } = await getCurrentPosition());
@@ -398,6 +414,34 @@ export function MapView() {
           onClose={() => setSelectedLead(null)}
           onChanged={() => refetchLeads()}
         />
+      )}
+
+      {locConsentOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center">
+          <div className="w-full max-w-sm space-y-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-center">
+            <MapPin className="mx-auto h-8 w-8 text-nsr-blue" />
+            <h3 className="text-lg font-semibold">Use your location</h3>
+            <p className="text-sm text-zinc-400">
+              NSR Elite uses your device location to show you on the canvassing map and log the doors
+              you knock. Location is collected <strong>only while you&apos;re using the app</strong> — never
+              in the background.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setLocConsentOpen(false)}
+                className="flex-1 rounded-xl border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+              >
+                Not now
+              </button>
+              <button
+                onClick={grantLocationConsent}
+                className="flex-1 rounded-xl bg-nsr-blue px-4 py-2.5 text-sm font-semibold text-black"
+              >
+                Allow
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
