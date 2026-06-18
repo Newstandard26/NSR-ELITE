@@ -28,21 +28,31 @@ export function PinTable() {
   }
 
   async function createPin(draft: PinDraft) {
-    await fetch("/api/disposition-statuses", {
+    const res = await fetch("/api/disposition-statuses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(normalize(draft)),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "Failed to create pin");
+      return;
+    }
     setCreating(false);
     mutate();
   }
 
   async function updatePin(id: string, draft: Partial<PinDraft>) {
-    await fetch(`/api/disposition-statuses/${id}`, {
+    const res = await fetch(`/api/disposition-statuses/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(normalize(draft)),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "Failed to save pin");
+      return;
+    }
     setEditing(null);
     mutate();
   }
