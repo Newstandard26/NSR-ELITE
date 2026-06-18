@@ -24,10 +24,10 @@ export async function GET(req: Request) {
 
 const createSchema = z.object({
   label: z.string().min(1),
-  abbreviation: z.string().max(4).optional(),
+  abbreviation: z.string().max(4).nullable().optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a hex color"),
   icon: z.string().min(1),
-  pipelineStage: z.string().optional(),
+  pipelineStage: z.string().nullable().optional(),
   isDefault: z.boolean().optional(),
 });
 
