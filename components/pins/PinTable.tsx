@@ -153,7 +153,6 @@ export function PinTable() {
                     </span>
                   )}
                 </div>
-                <span className="font-mono text-xs text-zinc-500">{pin.color}</span>
               </div>
               <span className="text-xs text-zinc-400">{pin._count?.leads ?? 0} leads</span>
               <button onClick={() => setEditing(pin.id)} className="p-2 hover:text-nsr-blue" aria-label="Edit">

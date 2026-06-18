@@ -68,7 +68,6 @@ export function PinEditor({
               onChange={(e) => setDraft((d) => ({ ...d, color: e.target.value }))}
               className="h-11 w-14 cursor-pointer rounded-lg border border-zinc-700 bg-transparent"
             />
-            <span className="font-mono text-sm text-zinc-400">{draft.color.toUpperCase()}</span>
           </div>
         </div>
         <div className="flex-1 space-y-1">
