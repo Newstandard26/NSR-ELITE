@@ -4,11 +4,11 @@
 import fs from "node:fs";
 import sharp from "sharp";
 
-const badge = fs.readFileSync("public/brand/logo-badge.svg", "utf8");
+const badge = fs.readFileSync("public/brand/logo-full.svg", "utf8");
 const inner = badge.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
 
 const BADGE_W = 1195.2;
-const BADGE_H = 282.5;
+const BADGE_H = 404.0;
 const SIZE = 1024;
 const TARGET_W = 900; // badge width within the icon
 const scale = TARGET_W / BADGE_W;
