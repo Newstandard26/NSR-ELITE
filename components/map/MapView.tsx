@@ -135,7 +135,7 @@ export function MapView() {
         el.className = "nsr-pin";
         // Show the abbreviation when set; fall back to the emoji icon.
         const fontSize = abbr ? "8px" : "15px";
-        el.style.cssText = `width:30px;height:30px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fontSize};font-weight:700;line-height:1;text-align:center;background:${color};box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:pointer;`;
+        el.style.cssText = `box-sizing:border-box;padding:0;margin:0;appearance:none;-webkit-appearance:none;width:30px;height:30px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fontSize};font-weight:700;line-height:1;text-align:center;color:#fff;background:${color};box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:pointer;`;
         el.textContent = abbr || icon;
         el.setAttribute("aria-label", lead.ownerName || lead.address);
         el.addEventListener("click", (e) => {
