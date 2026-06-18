@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
-import { LocateFixed, Flame, Filter, Plus, Search, MapPin } from "lucide-react";
+import { LocateFixed, Flame, Filter, Plus, Search, MapPin, Radio, Users } from "lucide-react";
 import { LeadCardDrawer } from "./LeadCardDrawer";
 import { MapFilterBar, type MapFilters } from "./MapFilterBar";
 import { LeadForm } from "@/components/leads/LeadForm";
@@ -23,11 +23,20 @@ const MAP_STYLE = "mapbox://styles/mapbox/satellite-streets-v12";
 // Roscoe, IL — NSR home base.
 const DEFAULT_CENTER: [number, number] = [-89.0937, 42.4111];
 
+interface RepPing {
+  repId: string;
+  name: string;
+  lat: number;
+  lng: number;
+  lastSeen: string;
+}
+
 export function MapView() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const repMarkersRef = useRef<mapboxgl.Marker[]>([]);
 
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
@@ -42,6 +51,15 @@ export function MapView() {
   const { data: territories = [] } = useSWR<TerritoryDTO[]>("/api/territories");
   const { data: session } = useSession();
   const isManager = session?.user?.role === "MANAGER" || session?.user?.role === "ADMIN";
+
+  // Live location: reps broadcast their position while sharing; managers/admins
+  // see everyone's latest position, refreshed every 30s.
+  const [sharing, setSharing] = useState(false);
+  const [showReps, setShowReps] = useState(true);
+  const { data: repLocations = [] } = useSWR<RepPing[]>(
+    isManager && showReps ? "/api/reps/locations" : null,
+    { refreshInterval: 30_000 },
+  );
 
   // Build the leads query string from active filters.
   const leadsQuery = useMemo(() => {
@@ -69,6 +87,42 @@ export function MapView() {
     const map = mapRef.current;
     if (map) map.getCanvas().style.cursor = dropMode ? "crosshair" : "";
   }, [dropMode]);
+
+  // Resume sharing if the rep consented and didn't turn it off.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (
+      localStorage.getItem("nsr_loc_consent") === "1" &&
+      localStorage.getItem("nsr_loc_share") !== "0"
+    ) {
+      setSharing(true);
+    }
+  }, []);
+
+  // While sharing, broadcast position now and every 60s (foreground only).
+  useEffect(() => {
+    if (!sharing) return;
+    let cancelled = false;
+    const ping = async () => {
+      try {
+        const { lat, lng } = await getCurrentPosition();
+        if (cancelled) return;
+        fetch("/api/reps/location", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lng }),
+        }).catch(() => {});
+      } catch {
+        /* ignore — rep may have denied the OS prompt */
+      }
+    };
+    ping();
+    const id = window.setInterval(ping, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [sharing]);
 
   // --- Initialize map once ---
   useEffect(() => {
@@ -163,6 +217,43 @@ export function MapView() {
     if (map.isStyleLoaded()) renderMarkers();
     else map.once("load", renderMarkers);
   }, [leads, isManager]);
+
+  // --- Live rep location markers (managers/admins only) ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const render = () => {
+      repMarkersRef.current.forEach((m) => m.remove());
+      repMarkersRef.current = [];
+      if (!isManager || !showReps) return;
+
+      const now = Date.now();
+      for (const r of repLocations) {
+        if (r.repId === session?.user?.id) continue; // don't pin yourself
+        const ageMin = (now - new Date(r.lastSeen).getTime()) / 60_000;
+        if (ageMin > 30) continue; // not "live" anymore
+        const live = ageMin < 5;
+
+        const el = document.createElement("div");
+        el.style.cssText = `display:flex;align-items:center;gap:5px;padding:3px 9px 3px 6px;border-radius:9999px;background:rgba(9,9,11,.85);border:1px solid ${live ? "#22C55E" : "#52525b"};box-shadow:0 1px 4px rgba(0,0,0,.5);white-space:nowrap;opacity:${live ? 1 : 0.65};cursor:default;`;
+        const dot = document.createElement("span");
+        dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${live ? "#22C55E" : "#9ca3af"};box-shadow:${live ? "0 0 0 3px rgba(34,197,94,.3)" : "none"};`;
+        const name = document.createElement("span");
+        name.style.cssText = "font-size:11px;font-weight:600;color:#fff;";
+        name.textContent = r.name.split(" ")[0];
+        el.appendChild(dot);
+        el.appendChild(name);
+        el.title = `${r.name} · ${ageMin < 1 ? "just now" : `${Math.round(ageMin)}m ago`}`;
+
+        const marker = new mapboxgl.Marker({ element: el }).setLngLat([r.lng, r.lat]).addTo(map);
+        repMarkersRef.current.push(marker);
+      }
+    };
+
+    if (map.isStyleLoaded()) render();
+    else map.once("load", render);
+  }, [repLocations, isManager, showReps, session?.user?.id]);
 
   // --- Territory polygon overlay ---
   useEffect(() => {
@@ -278,8 +369,25 @@ export function MapView() {
 
   function grantLocationConsent() {
     localStorage.setItem("nsr_loc_consent", "1");
+    localStorage.setItem("nsr_loc_share", "1");
     setLocConsentOpen(false);
+    setSharing(true); // start broadcasting live location to managers
     runLocation();
+  }
+
+  // Toggle live location sharing on/off (requires consent the first time).
+  function toggleSharing() {
+    if (sharing) {
+      localStorage.setItem("nsr_loc_share", "0");
+      setSharing(false);
+      return;
+    }
+    if (typeof window !== "undefined" && localStorage.getItem("nsr_loc_consent") !== "1") {
+      setLocConsentOpen(true);
+      return;
+    }
+    localStorage.setItem("nsr_loc_share", "1");
+    setSharing(true);
   }
 
   async function runLocation() {
@@ -385,6 +493,28 @@ export function MapView() {
         >
           <LocateFixed className="h-5 w-5" />
         </button>
+        <button
+          onClick={toggleSharing}
+          aria-label={sharing ? "Stop sharing my location" : "Share my live location"}
+          title={sharing ? "Sharing your live location" : "Share your live location"}
+          className={`flex h-11 w-11 items-center justify-center rounded-full border border-zinc-700 backdrop-blur ${
+            sharing ? "bg-green-500 text-black" : "bg-zinc-900/90 text-white"
+          }`}
+        >
+          <Radio className="h-5 w-5" />
+        </button>
+        {isManager && (
+          <button
+            onClick={() => setShowReps((v) => !v)}
+            aria-label="Toggle live rep locations"
+            title="Show reps' live locations"
+            className={`flex h-11 w-11 items-center justify-center rounded-full border border-zinc-700 backdrop-blur ${
+              showReps ? "bg-nsr-blue text-black" : "bg-zinc-900/90 text-white"
+            }`}
+          >
+            <Users className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Drop-mode hint */}
@@ -422,9 +552,10 @@ export function MapView() {
             <MapPin className="mx-auto h-8 w-8 text-nsr-blue" />
             <h3 className="text-lg font-semibold">Use your location</h3>
             <p className="text-sm text-zinc-400">
-              NSR Elite uses your device location to show you on the canvassing map and log the doors
-              you knock. Location is collected <strong>only while you&apos;re using the app</strong> — never
-              in the background.
+              NSR Elite uses your device location to show you on the canvassing map, log the doors you
+              knock, and—while you&apos;re on the map—share your live position with your managers.
+              Location is collected <strong>only while you&apos;re using the app</strong> — never in the
+              background. You can stop sharing anytime with the broadcast button.
             </p>
             <div className="flex gap-2 pt-1">
               <button
