@@ -134,7 +134,6 @@ export function PinTable() {
               ) : (
                 <span className="w-4" />
               )}
-              <span className="text-xl">{pin.icon}</span>
               <span
                 className="h-5 w-5 rounded-full border border-zinc-700"
                 style={{ backgroundColor: pin.color }}

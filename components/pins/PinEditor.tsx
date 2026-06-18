@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { EmojiPicker } from "./EmojiPicker";
+import { colorToEmoji } from "@/lib/utils";
 import { PIPELINE_STAGES, type DispositionStatusDTO } from "@/lib/types";
 
 export interface PinDraft {
@@ -40,22 +40,20 @@ export function PinEditor({
   async function save() {
     if (!draft.label.trim()) return;
     setBusy(true);
-    await onSave(draft);
+    // Color is the single identity; derive the dropdown glyph from it.
+    await onSave({ ...draft, icon: colorToEmoji(draft.color) });
     setBusy(false);
   }
 
   return (
     <div className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-      <div className="flex items-center gap-3">
-        <EmojiPicker value={draft.icon} onChange={(icon) => setDraft((d) => ({ ...d, icon }))} />
-        <div className="flex-1 space-y-1">
-          <label className="text-xs uppercase tracking-wide text-zinc-400">Label</label>
-          <Input
-            value={draft.label}
-            onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
-            placeholder="e.g. Interested / Appointment Set"
-          />
-        </div>
+      <div className="space-y-1">
+        <label className="text-xs uppercase tracking-wide text-zinc-400">Label</label>
+        <Input
+          value={draft.label}
+          onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
+          placeholder="e.g. Interested / Appointment Set"
+        />
       </div>
 
       <div className="flex items-center gap-3">
