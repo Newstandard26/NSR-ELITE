@@ -417,7 +417,7 @@ export function MapView() {
   }
 
   return (
-    <div className="relative h-[calc(100vh-56px)] w-full sm:h-screen">
+    <div className="relative h-full w-full">
       <div ref={mapContainer} className="absolute inset-0" />
 
       {/* Top filter bar */}
