@@ -14,10 +14,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   await touchActivity(session.user.id);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-[100dvh] flex-col overflow-hidden sm:flex-row">
       <BrandingApplier />
       <SideNav />
-      <main className="flex-1 pb-14 sm:pb-0">{children}</main>
+      <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       <BottomNav />
     </div>
   );
