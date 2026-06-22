@@ -4,7 +4,7 @@
   "description": "New Standard Restoration field canvassing & door-knocking",
   "start_url": "/map",
   "display": "standalone",
-  "background_color": "#000000",
+  "background_color": "#0d0d0d",
   "theme_color": "#51C5F4",
   "orientation": "portrait",
   "icons": [
