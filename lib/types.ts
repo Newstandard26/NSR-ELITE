@@ -34,6 +34,8 @@ export interface LeadDTO {
   lat: number;
   lng: number;
   ownerName: string | null;
+  firstName: string | null;
+  lastName: string | null;
   phone: string | null;
   email: string | null;
   roofAge: number | null;

@@ -33,6 +33,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 const patchSchema = z.object({
   ownerName: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   roofAge: z.number().int().nullable().optional(),
@@ -53,6 +56,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const data: Record<string, unknown> = { ...body };
     if (body.email === "") data.email = null;
+    // Keep the legacy ownerName display field in sync with structured names.
+    if (body.firstName !== undefined || body.lastName !== undefined) {
+      data.ownerName = `${body.firstName ?? ""} ${body.lastName ?? ""}`.trim();
+    }
     if (body.dispositionStatusId !== undefined) {
       data.dispositionAt = new Date();
     }

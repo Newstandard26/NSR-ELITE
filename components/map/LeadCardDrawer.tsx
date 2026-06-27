@@ -12,6 +12,7 @@ import { DispositionBadge } from "@/components/ui/badge";
 import { DispositionSelector } from "./DispositionSelector";
 import { PropertyDataPanel } from "./PropertyDataPanel";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { missingCustomerFields, splitOwnerName } from "@/lib/leadValidation";
 import type { DispositionStatusDTO, LeadDTO, NoteDTO, RepStatsDTO } from "@/lib/types";
 
 interface LeadDetail extends LeadDTO {
@@ -37,6 +38,8 @@ export function LeadCardDrawer({
   const [apptOpen, setApptOpen] = useState(false);
   const [apptAt, setApptAt] = useState<Date | null>(null);
   const [apptType, setApptType] = useState("INSPECTION");
+  const [custOpen, setCustOpen] = useState(false);
+  const [cust, setCust] = useState({ firstName: "", lastName: "", address: "", phone: "", email: "" });
   const propertyEnrichEnabled = process.env.NEXT_PUBLIC_PROPERTY_ENRICHMENT_ENABLED === "true";
 
   async function updateDisposition(dispositionStatusId: string) {
@@ -76,7 +79,55 @@ export function LeadCardDrawer({
     setBusy(null);
   }
 
-  async function createAcculynxLead() {
+  // Gate: require customer info before pushing to AccuLynx. Opens a form to
+  // collect first/last name, address, and phone (email optional) when missing.
+  function startAcculynxPush() {
+    if (!lead) return;
+    if (missingCustomerFields(lead).length) {
+      const sp = splitOwnerName(lead.ownerName);
+      setCust({
+        firstName: lead.firstName || sp.first,
+        lastName: lead.lastName || sp.last,
+        address: lead.address || "",
+        phone: lead.phone || "",
+        email: lead.email || "",
+      });
+      setCustOpen(true);
+      return;
+    }
+    doAcculynxPush();
+  }
+
+  async function saveCustomerAndPush() {
+    if (!cust.firstName.trim() || !cust.lastName.trim() || !cust.address.trim() || !cust.phone.trim()) {
+      alert("First name, last name, address, and phone number are required.");
+      return;
+    }
+    setBusy("acculynx");
+    const res = await fetch(`/api/leads/${leadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: cust.firstName.trim(),
+        lastName: cust.lastName.trim(),
+        address: cust.address.trim(),
+        phone: cust.phone.trim(),
+        email: cust.email.trim(),
+      }),
+    });
+    if (!res.ok) {
+      setBusy(null);
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "Failed to save customer info");
+      return;
+    }
+    await mutate();
+    setCustOpen(false);
+    setBusy(null);
+    await doAcculynxPush();
+  }
+
+  async function doAcculynxPush() {
     setBusy("acculynx");
     const res = await fetch(`/api/leads/${leadId}/acculynx`, { method: "POST" });
     if (!res.ok) {
@@ -268,13 +319,38 @@ export function LeadCardDrawer({
               {!lead.acculynxJobId && (
                 <Button
                   className="col-span-2"
-                  onClick={createAcculynxLead}
+                  onClick={startAcculynxPush}
                   disabled={busy === "acculynx"}
                 >
                   {busy === "acculynx" ? "Creating…" : "Create AccuLynx Lead"}
                 </Button>
               )}
             </div>
+
+            {/* Customer-info gate before AccuLynx push */}
+            {custOpen && !lead.acculynxJobId && (
+              <div className="space-y-2 rounded-xl border border-nsr-blue/40 p-3">
+                <p className="text-sm font-semibold">Customer info required for AccuLynx</p>
+                <p className="text-xs text-zinc-500">
+                  Add the customer&apos;s name, address, and phone before pushing. Email is optional.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input placeholder="First name *" value={cust.firstName} onChange={(e) => setCust((c) => ({ ...c, firstName: e.target.value }))} />
+                  <Input placeholder="Last name *" value={cust.lastName} onChange={(e) => setCust((c) => ({ ...c, lastName: e.target.value }))} />
+                </div>
+                <Input placeholder="Address *" value={cust.address} onChange={(e) => setCust((c) => ({ ...c, address: e.target.value }))} />
+                <Input placeholder="Phone number *" type="tel" value={cust.phone} onChange={(e) => setCust((c) => ({ ...c, phone: e.target.value }))} />
+                <Input placeholder="Email (optional)" type="email" value={cust.email} onChange={(e) => setCust((c) => ({ ...c, email: e.target.value }))} />
+                <div className="flex gap-2">
+                  <Button variant="secondary" className="flex-1" onClick={() => setCustOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button className="flex-1" onClick={saveCustomerAndPush} disabled={busy === "acculynx"}>
+                    {busy === "acculynx" ? "Saving…" : "Save & push"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {apptOpen && (
               <div className="space-y-2 rounded-xl border border-zinc-800 p-3">

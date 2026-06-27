@@ -92,6 +92,8 @@ model Lead {
   lat                 Float
   lng                 Float
   ownerName           String?
+  firstName           String?
+  lastName            String?
   phone               String?
   email               String?
   roofAge             Int?
