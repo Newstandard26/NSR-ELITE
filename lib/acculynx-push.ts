@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/activity";
 import { getIntegrationSettings } from "@/lib/settings";
 import { logSync } from "@/lib/sync-log";
 import { notify } from "@/lib/notify";
+import { missingCustomerFields, customerFullName } from "@/lib/leadValidation";
 
 export interface PushResult {
   ok: boolean;
@@ -24,6 +25,12 @@ export async function pushLeadToAccuLynx(leadId: string): Promise<PushResult> {
   if (!lead) return { ok: false, error: "Lead not found" };
   if (lead.acculynxJobId) return { ok: true, alreadyLinked: true, jobId: lead.acculynxJobId };
 
+  // Gate: require customer info (first/last name, address, phone) before push.
+  const missing = missingCustomerFields(lead);
+  if (missing.length) {
+    return { ok: false, error: `Customer info required before pushing to AccuLynx: ${missing.join(", ")}.` };
+  }
+
   const notes = await prisma.note.findMany({
     where: { leadId: lead.id },
     orderBy: { createdAt: "asc" },
@@ -35,7 +42,7 @@ export async function pushLeadToAccuLynx(leadId: string): Promise<PushResult> {
   try {
     job = await acculynx().createLead({
       leadSourceId: settings.acculynxLeadSourceId,
-      name: lead.ownerName || lead.address,
+      name: customerFullName(lead) || lead.address,
       address: lead.address,
       city: lead.city,
       state: lead.state,
