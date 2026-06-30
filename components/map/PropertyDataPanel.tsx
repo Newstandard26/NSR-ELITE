@@ -33,12 +33,20 @@ export function PropertyDataPanel({
         <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
           <Home className="h-4 w-4 text-nsr-blue" /> Property data
         </div>
-        <p className="mb-2 text-xs text-zinc-500">
-          Pull owner, value, equity and contact info for this address.
-        </p>
-        <Button className="w-full" onClick={onPull} disabled={busy}>
-          {busy ? "Pulling…" : "Pull property data"}
-        </Button>
+        {busy ? (
+          <p className="flex items-center gap-2 text-sm text-zinc-400">
+            <RefreshCw className="h-4 w-4 animate-spin" /> Looking up owner &amp; property…
+          </p>
+        ) : (
+          <>
+            <p className="mb-2 text-xs text-zinc-500">
+              Pull owner, value, equity and contact info for this address.
+            </p>
+            <Button className="w-full" onClick={onPull}>
+              Pull property data
+            </Button>
+          </>
+        )}
       </div>
     );
   }

@@ -152,13 +152,20 @@ async function attomProvider(input: AddressInput): Promise<PropertyEnrichment> {
   const avm = num(p.avm?.amount?.value);
   const mortgage = num(p.assessment?.mortgage?.lender?.amount) ?? num(p.assessment?.mortgage?.amount);
 
+  // ATTOM key casing varies by endpoint/account; check common variants.
+  const owner = p.owner ?? p.assessment?.owner ?? {};
+  const o1 = owner.owner1 ?? {};
+  const joinedName = [o1.firstNameAndMi ?? o1.firstname ?? o1.firstName, o1.lastName ?? o1.lastname]
+    .filter(Boolean)
+    .join(" ");
+  const ownerName = o1.fullName ?? o1.fullname ?? (joinedName || null);
+  const absentee = p.summary?.absenteeInd ?? p.summary?.absenteeind;
+
   return {
     source: "attom",
-    ownerName: p.assessment?.owner?.owner1?.fullname ?? p.owner?.owner1?.fullname ?? null,
-    ownerOccupied: p.summary?.absenteeInd
-      ? /owner occupied/i.test(p.summary.absenteeInd)
-      : null,
-    mailingAddress: p.assessment?.owner?.mailingaddressoneline ?? null,
+    ownerName,
+    ownerOccupied: absentee ? /owner occupied/i.test(String(absentee)) : null,
+    mailingAddress: owner.mailingAddressOneLine ?? owner.mailingaddressoneline ?? null,
     yearBuilt: num(p.summary?.yearbuilt),
     sqft: num(p.building?.size?.livingsize) ?? num(p.building?.size?.universalsize),
     beds: num(p.building?.rooms?.beds),
