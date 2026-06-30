@@ -68,6 +68,24 @@ function activeProvider(): "mock" | "attom" {
     : "mock";
 }
 
+// Admin diagnostic: what the running server actually sees (never exposes the key
+// itself). Reveals redeploy/typo/scope problems behind "still showing mock".
+export function providerDiagnostics() {
+  const providerEnv = process.env.PROPERTY_DATA_PROVIDER ?? null;
+  const key = process.env.ATTOM_API_KEY ?? "";
+  return {
+    activeProvider: activeProvider(),
+    enrichmentEnabled: enrichmentEnabled(),
+    PROPERTY_DATA_PROVIDER: providerEnv,
+    providerIsExactlyAttom: providerEnv === "attom",
+    ATTOM_API_KEY_present: key.length > 0,
+    ATTOM_API_KEY_length: key.length,
+    PROPERTY_ENRICHMENT_ENABLED: process.env.PROPERTY_ENRICHMENT_ENABLED ?? null,
+    NEXT_PUBLIC_PROPERTY_ENRICHMENT_ENABLED:
+      process.env.NEXT_PUBLIC_PROPERTY_ENRICHMENT_ENABLED ?? null,
+  };
+}
+
 export function normalizeAddress(a: AddressInput): string {
   return `${a.address}, ${a.city}, ${a.state} ${a.zip}`.toLowerCase().replace(/\s+/g, " ").trim();
 }
