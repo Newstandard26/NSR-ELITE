@@ -168,7 +168,11 @@ async function attomProvider(input: AddressInput): Promise<PropertyEnrichment> {
     return Number.isFinite(n) ? n : null;
   };
   const avm = num(p.avm?.amount?.value);
+  const marketValue = num(p.assessment?.market?.mktttlvalue);
+  const assessedValue = num(p.assessment?.assessed?.assdttlvalue);
   const mortgage = num(p.assessment?.mortgage?.lender?.amount) ?? num(p.assessment?.mortgage?.amount);
+  // Value to display: AVM if the account has it, else market then assessed.
+  const value = avm ?? marketValue ?? assessedValue;
 
   // ATTOM key casing varies by endpoint/account; check common variants.
   const owner = p.owner ?? p.assessment?.owner ?? {};
@@ -184,18 +188,25 @@ async function attomProvider(input: AddressInput): Promise<PropertyEnrichment> {
     ownerName,
     ownerOccupied: absentee ? /owner occupied/i.test(String(absentee)) : null,
     mailingAddress: owner.mailingAddressOneLine ?? owner.mailingaddressoneline ?? null,
-    yearBuilt: num(p.summary?.yearbuilt),
-    sqft: num(p.building?.size?.livingsize) ?? num(p.building?.size?.universalsize),
+    yearBuilt:
+      num(p.summary?.yearbuilt) ?? num(p.summary?.yearBuilt) ?? num(p.vintage?.yearbuilt) ?? num(p.building?.summary?.yearbuilt),
+    sqft:
+      num(p.building?.size?.livingsize) ??
+      num(p.building?.size?.universalsize) ??
+      num(p.building?.size?.bldgsize) ??
+      num(p.building?.size?.grosssize),
     beds: num(p.building?.rooms?.beds),
-    baths: num(p.building?.rooms?.bathstotal),
-    lotSizeSqft: num(p.lot?.lotsize2),
-    lastSalePrice: num(p.sale?.amount?.saleamt),
-    lastSaleDate: p.sale?.salesearchdate ?? null,
-    assessedValue: num(p.assessment?.assessed?.assdttlvalue),
-    avmValue: avm,
+    baths: num(p.building?.rooms?.bathstotal) ?? num(p.building?.rooms?.bathsTotal) ?? num(p.building?.rooms?.bathsfull),
+    lotSizeSqft: num(p.lot?.lotsize2) ?? num(p.lot?.lotSize2),
+    lastSalePrice:
+      num(p.sale?.amount?.saleamt) ?? num(p.sale?.saleamt) ?? num(p.sale?.saleAmountData?.saleamt),
+    lastSaleDate:
+      p.sale?.salesearchdate ?? p.sale?.saleTransDate ?? p.sale?.amount?.salerecdate ?? null,
+    assessedValue,
+    avmValue: value,
     avmLow: num(p.avm?.amount?.low),
     avmHigh: num(p.avm?.amount?.high),
-    estimatedEquity: avm != null && mortgage != null ? Math.max(0, avm - mortgage) : null,
+    estimatedEquity: value != null && mortgage != null ? Math.max(0, value - mortgage) : null,
     mortgageBalanceEst: mortgage,
     // ATTOM expandedprofile does not include skip-trace contact or income;
     // those arrive in Phase 2 via the skip-trace provider (e.g. BatchData).
@@ -243,7 +254,7 @@ function toRecordData(e: PropertyEnrichment) {
 // the same address when available; otherwise calls the active provider and
 // caches the result. Auto-fills empty owner/phone/email on the lead. Returns
 // the PropertyRecord, or throws on hard failure.
-export async function enrichLead(leadId: string, actor?: string) {
+export async function enrichLead(leadId: string, actor?: string, opts?: { force?: boolean }) {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new Error("Lead not found");
 
@@ -251,7 +262,8 @@ export async function enrichLead(leadId: string, actor?: string) {
   const cutoff = new Date(Date.now() - CACHE_TTL_DAYS * 86_400_000);
 
   let record = await prisma.propertyRecord.findUnique({ where: { normalizedAddress: normalized } });
-  const fresh = record && record.fetchedAt >= cutoff;
+  // `force` (the Refresh button) re-fetches even if the cache is still fresh.
+  const fresh = !opts?.force && record && record.fetchedAt >= cutoff;
 
   if (!fresh) {
     const enrichment = await fetchFromProvider(lead);
