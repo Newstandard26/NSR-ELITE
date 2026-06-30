@@ -176,9 +176,11 @@ export function LeadCardDrawer({
     setBusy(null);
   }
 
-  async function pullPropertyData(opts?: { silent?: boolean }) {
+  async function pullPropertyData(opts?: { silent?: boolean; force?: boolean }) {
     setBusy("property");
-    const res = await fetch(`/api/leads/${leadId}/enrich`, { method: "POST" });
+    const res = await fetch(`/api/leads/${leadId}/enrich${opts?.force ? "?force=1" : ""}`, {
+      method: "POST",
+    });
     if (!res.ok && !opts?.silent) {
       const err = await res.json().catch(() => ({}));
       alert(err.error || "Failed to pull property data");
@@ -284,7 +286,7 @@ export function LeadCardDrawer({
               <PropertyDataPanel
                 record={lead.propertyRecord}
                 enrichedAt={lead.enrichedAt}
-                onPull={pullPropertyData}
+                onPull={() => pullPropertyData({ force: !!lead.propertyRecord })}
                 busy={busy === "property"}
               />
             )}
