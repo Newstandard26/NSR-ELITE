@@ -87,11 +87,11 @@ function hash(s: string): number {
 function mockProvider(input: AddressInput): PropertyEnrichment {
   const seed = hash(normalizeAddress(input));
   const rnd = (n: number, lo: number, hi: number) =>
-    lo + (((seed >> n) % 1000) / 1000) * (hi - lo);
+    lo + (((seed >>>n) % 1000) / 1000) * (hi - lo);
 
   const firstNames = ["James", "Maria", "Robert", "Linda", "David", "Patricia", "John", "Jennifer"];
   const lastNames = ["Smith", "Johnson", "Garcia", "Martinez", "Davis", "Lopez", "Wilson", "Nguyen"];
-  const owner = `${firstNames[seed % firstNames.length]} ${lastNames[(seed >> 3) % lastNames.length]}`;
+  const owner = `${firstNames[seed % firstNames.length]} ${lastNames[(seed >>>3) % lastNames.length]}`;
 
   const avm = Math.round(rnd(2, 180_000, 650_000) / 1000) * 1000;
   const mortgage = Math.round((avm * rnd(5, 0.1, 0.75)) / 1000) * 1000;
@@ -108,7 +108,7 @@ function mockProvider(input: AddressInput): PropertyEnrichment {
     yearBuilt: Math.round(rnd(7, 1955, 2018)),
     sqft: Math.round(rnd(9, 1100, 3800) / 50) * 50,
     beds: 2 + (seed % 4),
-    baths: 1 + ((seed >> 2) % 3),
+    baths: 1 + ((seed >>>2) % 3),
     lotSizeSqft: Math.round(rnd(11, 4000, 15000) / 100) * 100,
     lastSalePrice: Math.round((avm * rnd(13, 0.6, 0.95)) / 1000) * 1000,
     lastSaleDate: new Date(2010 + (seed % 14), seed % 12, 1 + (seed % 27)).toISOString().slice(0, 10),
@@ -121,7 +121,7 @@ function mockProvider(input: AddressInput): PropertyEnrichment {
     estimatedIncomeBand: incomeBands[seed % incomeBands.length],
     phones: [
       { number: `(${200 + (seed % 700)}) 555-${String(1000 + (seed % 9000)).slice(0, 4)}`, type: "mobile", dnc: seed % 5 === 0 },
-      { number: `(${200 + ((seed >> 4) % 700)}) 555-${String(1000 + ((seed >> 4) % 9000)).slice(0, 4)}`, type: "landline", dnc: false },
+      { number: `(${200 + ((seed >>>4) % 700)}) 555-${String(1000 + ((seed >>>4) % 9000)).slice(0, 4)}`, type: "landline", dnc: false },
     ],
     emails: [`${owner.toLowerCase().replace(/[^a-z]/g, ".")}@example.com`],
     raw: { mock: true, seed },
