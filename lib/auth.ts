@@ -3,7 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { getServerSession } from "next-auth";
 import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { prisma, withDbRetry } from "@/lib/db";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
@@ -17,9 +17,11 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials.password) return null;
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase() },
-        });
+        // Retry transient DB connection drops so a dropped Neon connection
+        // doesn't cause an intermittent silent login failure.
+        const user = await withDbRetry(() =>
+          prisma.user.findUnique({ where: { email: credentials.email.toLowerCase() } }),
+        );
         if (!user || !user.passwordHash || !user.isActive) return null;
         const ok = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!ok) return null;

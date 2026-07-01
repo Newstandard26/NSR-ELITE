@@ -6,6 +6,17 @@ import { handleError, json } from "@/lib/api";
 import { geocodeAddress, composeAddress } from "@/lib/geocode";
 import { logActivity } from "@/lib/activity";
 
+// Parse a query-string date, rejecting invalid or absurd out-of-range values
+// (which would otherwise make Prisma throw and blank the leads/map view).
+function safeDate(s: string | null): Date | undefined {
+  if (!s) return undefined;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const y = d.getUTCFullYear();
+  if (y < 2000 || y > 2100) return undefined;
+  return d;
+}
+
 // GET /api/leads — filters: status, rep, territory, dateFrom, dateTo, search
 export async function GET(req: Request) {
   try {
@@ -28,10 +39,14 @@ export async function GET(req: Request) {
     } else if (rep) {
       where.repId = rep;
     }
-    if (dateFrom || dateTo) {
+    // Parse dates defensively — a malformed filter (e.g. an out-of-range year)
+    // otherwise crashes the whole leads query.
+    const from = safeDate(dateFrom);
+    const to = safeDate(dateTo);
+    if (from || to) {
       where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo);
+      if (from) where.createdAt.gte = from;
+      if (to) where.createdAt.lte = to;
     }
     if (search) {
       where.OR = [
