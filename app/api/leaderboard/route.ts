@@ -2,23 +2,34 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
+import {
+  startOfToday, startOfWeek, startOfMonth,
+  startOfPrevDay, startOfPrevWeek, startOfPrevMonth, EPOCH,
+} from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 type Range = "today" | "week" | "month" | "all";
 
+// Business-timezone-aware windows, with the matching previous period for movement.
 function windowFor(range: Range): { start: Date; end: Date; prevStart: Date; prevEnd: Date } {
   const end = new Date();
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  if (range === "week") start.setDate(start.getDate() - start.getDay());
-  else if (range === "month") start.setDate(1);
-  else if (range === "all") start.setFullYear(2000);
-  // Previous comparable window.
-  const span = end.getTime() - start.getTime();
-  const prevEnd = new Date(start.getTime());
-  const prevStart = new Date(start.getTime() - span);
-  return { start, end, prevStart, prevEnd };
+  let start: Date;
+  let prevStart: Date;
+  if (range === "week") {
+    start = startOfWeek();
+    prevStart = startOfPrevWeek();
+  } else if (range === "month") {
+    start = startOfMonth();
+    prevStart = startOfPrevMonth();
+  } else if (range === "all") {
+    start = EPOCH;
+    prevStart = EPOCH;
+  } else {
+    start = startOfToday();
+    prevStart = startOfPrevDay();
+  }
+  return { start, end, prevStart, prevEnd: start };
 }
 
 interface Row { repId: string; name: string; doors: number; appointmentsSet: number; acculynxLeads: number; conversionRate: number; }
