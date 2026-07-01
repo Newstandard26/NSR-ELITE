@@ -2,12 +2,10 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -17,10 +15,29 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const res = await signIn("credentials", { email, password, redirect: false });
-    setBusy(false);
-    if (res?.error) setError("Invalid email or password");
-    else router.push("/dashboard");
+    try {
+      const res = await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+      });
+      if (!res) {
+        setError("Couldn't reach the server. Check your connection and try again.");
+        setBusy(false);
+        return;
+      }
+      if (res.error) {
+        setError("Invalid email or password.");
+        setBusy(false);
+        return;
+      }
+      // Success: full-page navigation so the new session cookie is reliably
+      // applied (more robust than client routing inside the mobile app WebView).
+      window.location.assign("/dashboard");
+    } catch {
+      setError("Something went wrong signing in. Please try again.");
+      setBusy(false);
+    }
   }
 
   return (
