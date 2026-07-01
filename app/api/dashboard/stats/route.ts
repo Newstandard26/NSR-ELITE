@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
+import { startOfToday, startOfWeek, startOfMonth, EPOCH } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -9,11 +10,8 @@ type Range = "today" | "week" | "month" | "all";
 
 function windowFor(range: Range): { start: Date; end: Date } {
   const end = new Date();
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  if (range === "week") start.setDate(start.getDate() - start.getDay());
-  else if (range === "month") start.setDate(1);
-  else if (range === "all") start.setFullYear(2000);
+  const start =
+    range === "week" ? startOfWeek() : range === "month" ? startOfMonth() : range === "all" ? EPOCH : startOfToday();
   return { start, end };
 }
 
@@ -89,9 +87,8 @@ export async function GET(req: Request) {
     );
     reps.sort((a, b) => b.doors - a.doors);
 
-    // Live reps today (GPS pinged today).
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    // Live reps today (GPS pinged today, business-timezone day).
+    const todayStart = startOfToday();
     const liveRaw = await prisma.repLocation.findMany({
       where: { timestamp: { gte: todayStart } },
       orderBy: { timestamp: "desc" },

@@ -1,23 +1,8 @@
 import { prisma } from "@/lib/db";
+import { startOfToday, startOfWeek, startOfMonth } from "@/lib/time";
 
-export function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-export function startOfWeek(): Date {
-  const d = startOfToday();
-  const day = d.getDay(); // 0 = Sunday
-  d.setDate(d.getDate() - day);
-  return d;
-}
-
-export function startOfMonth(): Date {
-  const d = startOfToday();
-  d.setDate(1);
-  return d;
-}
+// Re-exported for existing importers; boundaries are business-timezone aware.
+export { startOfToday, startOfWeek, startOfMonth };
 
 // A "knock" = any lead whose disposition was set/updated in the window by a rep.
 // We approximate knocks via dispositionAt timestamps.
