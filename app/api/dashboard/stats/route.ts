@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 
     // Rep performance within the window.
     const repUsers = await prisma.user.findMany({
-      where: { role: { in: ["REP", "MANAGER"] }, isActive: true },
+      where: { role: { in: ["REP", "MANAGER", "ADMIN"] }, isActive: true },
       select: { id: true, name: true },
     });
     const reps = await Promise.all(

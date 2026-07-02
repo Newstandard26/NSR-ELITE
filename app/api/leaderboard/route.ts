@@ -36,7 +36,7 @@ interface Row { repId: string; name: string; doors: number; appointmentsSet: num
 
 async function compute(start: Date, end: Date, territoryId?: string): Promise<Row[]> {
   const reps = await prisma.user.findMany({
-    where: { role: { in: ["REP", "MANAGER"] }, isActive: true },
+    where: { role: { in: ["REP", "MANAGER", "ADMIN"] }, isActive: true },
     select: { id: true, name: true },
   });
   const territoryWhere: Prisma.LeadWhereInput = territoryId ? { territoryId } : {};
