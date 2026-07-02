@@ -6,6 +6,7 @@ import { handleError, json } from "@/lib/api";
 import { acculynx } from "@/lib/acculynx";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
+import { startOfToday, startOfWeek, startOfMonth } from "@/lib/time";
 
 // GET /api/appointments — reps see their own; managers/admins see all.
 // Filters: rep, from, to, status
@@ -25,6 +26,13 @@ export async function GET(req: Request) {
       where.scheduledAt = {};
       if (from) where.scheduledAt.gte = new Date(from);
       if (to) where.scheduledAt.lte = new Date(to);
+    }
+    // Range drill-down from the dashboard "Appointments" card (matches its count,
+    // which scopes scheduledAt to the window up to now).
+    const range = searchParams.get("range");
+    if (range && range !== "all") {
+      const start = range === "week" ? startOfWeek() : range === "month" ? startOfMonth() : startOfToday();
+      where.scheduledAt = { gte: start, lte: new Date() };
     }
 
     const appointments = await prisma.appointment.findMany({
