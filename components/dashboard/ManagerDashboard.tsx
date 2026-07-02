@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { Radio } from "lucide-react";
+import { Radio, ChevronRight } from "lucide-react";
 import { Card, CardLabel, CardTitle } from "@/components/ui/card";
 
 interface RepRow { repId: string; name: string; doors: number; appointmentsSet: number; acculynxLeads: number; conversionRate: number }
@@ -28,13 +29,15 @@ export function ManagerDashboard() {
   const { data } = useSWR<DashboardData>(`/api/dashboard/stats?range=${range}`);
   const c = data?.cards;
 
+  // Each card links to the matching list, scoped to the selected range where
+  // the target list supports it.
   const cards = [
-    { label: "Active Territories", value: c?.activeTerritories },
-    { label: "Total Leads", value: c?.totalLeads },
-    { label: "Knocked", value: c?.knocked },
-    { label: "Appointments", value: c?.appointments },
-    { label: "AccuLynx Leads", value: c?.acculynx },
-    { label: "Conversion %", value: c ? `${c.conversionPct}%` : undefined },
+    { label: "Active Territories", value: c?.activeTerritories, href: "/territories" },
+    { label: "Total Leads", value: c?.totalLeads, href: "/leads" },
+    { label: "Knocked", value: c?.knocked, href: `/leads?range=${range}` },
+    { label: "Appointments", value: c?.appointments, href: "/appointments" },
+    { label: "AccuLynx Leads", value: c?.acculynx, href: "/leads?acculynx=1" },
+    { label: "Conversion %", value: c ? `${c.conversionPct}%` : undefined, href: "/leaderboard" },
   ];
 
   return (
@@ -50,10 +53,15 @@ export function ManagerDashboard() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {cards.map((card) => (
-          <Card key={card.label}>
-            <CardLabel>{card.label}</CardLabel>
-            <CardTitle className="mt-1 text-2xl">{card.value ?? "—"}</CardTitle>
-          </Card>
+          <Link key={card.label} href={card.href} className="block">
+            <Card className="h-full cursor-pointer transition hover:border-nsr-blue/60 hover:bg-zinc-800/60">
+              <div className="flex items-start justify-between">
+                <CardLabel>{card.label}</CardLabel>
+                <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" />
+              </div>
+              <CardTitle className="mt-1 text-2xl">{card.value ?? "—"}</CardTitle>
+            </Card>
+          </Link>
         ))}
       </div>
 

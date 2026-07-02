@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { geocodeAddress, composeAddress } from "@/lib/geocode";
 import { logActivity } from "@/lib/activity";
+import { startOfToday, startOfWeek, startOfMonth } from "@/lib/time";
 
 // Parse a query-string date, rejecting invalid or absurd out-of-range values
 // (which would otherwise make Prisma throw and blank the leads/map view).
@@ -30,9 +31,19 @@ export async function GET(req: Request) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
     const search = searchParams.get("search");
+    const range = searchParams.get("range");
+    const acculynx = searchParams.get("acculynx");
 
     if (status) where.dispositionStatusId = status;
     if (territory) where.territoryId = territory;
+    // Only leads pushed to AccuLynx (matches the dashboard "AccuLynx Leads" card).
+    if (acculynx === "1") where.acculynxJobId = { not: null };
+    // Knocked-in-range: leads dispositioned within the selected window (matches
+    // the dashboard "Knocked" card, which counts by dispositionAt).
+    if (range && range !== "all") {
+      const start = range === "week" ? startOfWeek() : range === "month" ? startOfMonth() : startOfToday();
+      where.dispositionAt = { gte: start, lte: new Date() };
+    }
     // Reps only see their own leads unless a manager/admin asks for a specific rep.
     if (user.role === "REP") {
       where.repId = user.id;

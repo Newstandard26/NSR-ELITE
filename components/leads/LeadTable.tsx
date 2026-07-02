@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Plus, Download, Filter, ChevronUp, ChevronDown, Trash2, X, Settings2, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,11 @@ export function LeadTable() {
   );
   const { data: territories = [] } = useSWR<{ id: string; name: string }[]>("/api/territories");
 
+  // Filters passed in via URL (e.g. from the dashboard cards).
+  const searchParams = useSearchParams();
+  const rangeParam = searchParams.get("range");
+  const acculynxParam = searchParams.get("acculynx");
+
   // Persist column visibility.
   useEffect(() => {
     const saved = localStorage.getItem("nsr.leadCols");
@@ -68,8 +73,10 @@ export function LeadTable() {
     if (filters.territory) qs.set("territory", filters.territory);
     if (filters.dateFrom) qs.set("dateFrom", filters.dateFrom);
     if (filters.dateTo) qs.set("dateTo", filters.dateTo);
+    if (rangeParam) qs.set("range", rangeParam);
+    if (acculynxParam) qs.set("acculynx", acculynxParam);
     return qs.toString();
-  }, [page, limit, sort, order, search, filters]);
+  }, [page, limit, sort, order, search, filters, rangeParam, acculynxParam]);
 
   const { data, mutate } = useSWR<Paged>(`/api/leads?${query}`);
   const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
@@ -146,6 +153,18 @@ export function LeadTable() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4">
+      {(rangeParam || acculynxParam) && (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-nsr-blue/40 bg-nsr-blue/5 px-3 py-2 text-sm">
+          <span className="text-zinc-300">
+            {acculynxParam
+              ? "Showing leads pushed to AccuLynx"
+              : `Showing doors knocked ${rangeParam === "week" ? "this week" : rangeParam === "month" ? "this month" : "today"}`}
+          </span>
+          <Link href="/leads" className="shrink-0 font-medium text-nsr-blue hover:underline">
+            View all
+          </Link>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Leads</h1>
         <div className="flex flex-wrap items-center gap-2">
