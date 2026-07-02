@@ -35,7 +35,7 @@ export function ManagerDashboard() {
     { label: "Active Territories", value: c?.activeTerritories, href: "/territories" },
     { label: "Total Leads", value: c?.totalLeads, href: "/leads" },
     { label: "Knocked", value: c?.knocked, href: `/leads?range=${range}` },
-    { label: "Appointments", value: c?.appointments, href: "/appointments" },
+    { label: "Appointments", value: c?.appointments, href: `/appointments?range=${range}` },
     { label: "AccuLynx Leads", value: c?.acculynx, href: "/leads?acculynx=1" },
     { label: "Conversion %", value: c ? `${c.conversionPct}%` : undefined, href: "/leaderboard" },
   ];
@@ -154,8 +154,13 @@ export function ManagerDashboard() {
             </thead>
             <tbody>
               {(data?.reps ?? []).map((r) => (
-                <tr key={r.repId} className="border-t border-zinc-800">
-                  <td className="p-3 font-medium">{r.name}</td>
+                <tr key={r.repId} className="border-t border-zinc-800 transition hover:bg-zinc-800/60">
+                  <td className="p-3 font-medium">
+                    <Link href={`/leads?rep=${r.repId}&range=${range}`} className="flex items-center gap-1 text-nsr-blue hover:underline">
+                      {r.name}
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </td>
                   <td className="p-3 text-right">{r.doors}</td>
                   <td className="p-3 text-right">{r.appointmentsSet}</td>
                   <td className="p-3 text-right">{r.acculynxLeads}</td>

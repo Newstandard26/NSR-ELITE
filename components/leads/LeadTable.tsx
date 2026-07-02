@@ -51,10 +51,11 @@ export function LeadTable() {
   );
   const { data: territories = [] } = useSWR<{ id: string; name: string }[]>("/api/territories");
 
-  // Filters passed in via URL (e.g. from the dashboard cards).
+  // Filters passed in via URL (e.g. from the dashboard cards / leaderboard).
   const searchParams = useSearchParams();
   const rangeParam = searchParams.get("range");
   const acculynxParam = searchParams.get("acculynx");
+  const repParam = searchParams.get("rep");
 
   // Persist column visibility.
   useEffect(() => {
@@ -75,8 +76,9 @@ export function LeadTable() {
     if (filters.dateTo) qs.set("dateTo", filters.dateTo);
     if (rangeParam) qs.set("range", rangeParam);
     if (acculynxParam) qs.set("acculynx", acculynxParam);
+    if (repParam) qs.set("rep", repParam);
     return qs.toString();
-  }, [page, limit, sort, order, search, filters, rangeParam, acculynxParam]);
+  }, [page, limit, sort, order, search, filters, rangeParam, acculynxParam, repParam]);
 
   const { data, mutate } = useSWR<Paged>(`/api/leads?${query}`);
   const { data: statuses = [] } = useSWR<DispositionStatusDTO[]>("/api/disposition-statuses");
@@ -151,15 +153,20 @@ export function LeadTable() {
     </th>
   );
 
+  const repName = repParam ? reps.find((r) => r.repId === repParam)?.name : undefined;
+  const rangeLabel = rangeParam === "week" ? "this week" : rangeParam === "month" ? "this month" : "today";
+  const who = repName ? `${repName}'s ` : "";
+  const filterDesc = acculynxParam
+    ? `Showing ${who}leads pushed to AccuLynx`
+    : rangeParam
+      ? `Showing ${who}doors knocked ${rangeLabel}`
+      : `Showing ${who}leads`;
+
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4">
-      {(rangeParam || acculynxParam) && (
+      {(rangeParam || acculynxParam || repParam) && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-nsr-blue/40 bg-nsr-blue/5 px-3 py-2 text-sm">
-          <span className="text-zinc-300">
-            {acculynxParam
-              ? "Showing leads pushed to AccuLynx"
-              : `Showing doors knocked ${rangeParam === "week" ? "this week" : rangeParam === "month" ? "this month" : "today"}`}
-          </span>
+          <span className="text-zinc-300">{filterDesc}</span>
           <Link href="/leads" className="shrink-0 font-medium text-nsr-blue hover:underline">
             View all
           </Link>

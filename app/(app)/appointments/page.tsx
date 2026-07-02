@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,13 +27,15 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "Canceled",
 };
 
-export default function AppointmentsPage() {
+function AppointmentsContent() {
   const [filters, setFilters] = useState<{ rep?: string; status?: string; from?: string; to?: string }>({});
+  const rangeParam = useSearchParams().get("range");
   const qs = new URLSearchParams();
   if (filters.rep) qs.set("rep", filters.rep);
   if (filters.status) qs.set("status", filters.status);
   if (filters.from) qs.set("from", filters.from);
   if (filters.to) qs.set("to", filters.to);
+  if (rangeParam) qs.set("range", rangeParam);
   const { data: appts = [], mutate } = useSWR<ApptDTO[]>(`/api/appointments?${qs.toString()}`);
   const { data: reps = [] } = useSWR<RepStatsDTO[]>("/api/reps");
   const [scheduling, setScheduling] = useState(false);
@@ -55,6 +58,16 @@ export default function AppointmentsPage() {
           <Plus className="h-4 w-4" /> Schedule
         </Button>
       </div>
+      {rangeParam && (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-nsr-blue/40 bg-nsr-blue/5 px-3 py-2 text-sm">
+          <span className="text-zinc-300">
+            Showing appointments {rangeParam === "week" ? "this week" : rangeParam === "month" ? "this month" : "today"}
+          </span>
+          <Link href="/appointments" className="shrink-0 font-medium text-nsr-blue hover:underline">
+            View all
+          </Link>
+        </div>
+      )}
 
       {scheduling && <ScheduleModal reps={reps} onClose={() => setScheduling(false)} onSaved={() => mutate()} />}
 
@@ -195,5 +208,14 @@ function ScheduleModal({ reps, onClose, onSaved }: { reps: RepStatsDTO[]; onClos
         <Button className="w-full" onClick={save} disabled={busy || !leadId || !date || !time}>{busy ? "Saving…" : "Schedule"}</Button>
       </div>
     </div>
+  );
+}
+
+// useSearchParams (range drill-down) must be inside a Suspense boundary.
+export default function AppointmentsPage() {
+  return (
+    <Suspense fallback={<div className="p-4 text-sm text-zinc-500">Loading…</div>}>
+      <AppointmentsContent />
+    </Suspense>
   );
 }
