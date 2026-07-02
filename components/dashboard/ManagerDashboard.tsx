@@ -24,7 +24,7 @@ const RANGES = [
 ] as const;
 
 export function ManagerDashboard() {
-  const [range, setRange] = useState<string>("week");
+  const [range, setRange] = useState<string>("today");
   const { data } = useSWR<DashboardData>(`/api/dashboard/stats?range=${range}`);
   const c = data?.cards;
 
