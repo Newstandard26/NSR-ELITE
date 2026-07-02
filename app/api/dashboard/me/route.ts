@@ -16,8 +16,9 @@ export async function GET() {
     const [doorsToday, appointmentsToday, leadsToday, acculynxWeek, doorsWeek] = await Promise.all([
       prisma.lead.count({ where: { repId: user.id, dispositionAt: { gte: today } } }),
       prisma.appointment.count({ where: { repId: user.id, scheduledAt: { gte: today }, status: "SCHEDULED" } }),
-      prisma.lead.count({ where: { repId: user.id, createdAt: { gte: today } } }),
-      prisma.lead.count({ where: { repId: user.id, acculynxJobId: { not: null }, updatedAt: { gte: week } } }),
+      // A "Lead" = a door pushed to AccuLynx (not just any pin created).
+      prisma.lead.count({ where: { repId: user.id, acculynxJobId: { not: null }, acculynxPushedAt: { gte: today } } }),
+      prisma.lead.count({ where: { repId: user.id, acculynxJobId: { not: null }, acculynxPushedAt: { gte: week } } }),
       prisma.lead.count({ where: { repId: user.id, dispositionAt: { gte: week } } }),
     ]);
     const conversionRate = doorsWeek > 0 ? Math.round((acculynxWeek / doorsWeek) * 100) : 0;

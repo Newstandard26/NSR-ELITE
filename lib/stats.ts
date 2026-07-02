@@ -37,7 +37,7 @@ export async function computeRepStats(): Promise<RepStats[]> {
       prisma.lead.count({ where: { repId: rep.id, dispositionAt: { gte: month } } }),
       prisma.appointment.count({ where: { repId: rep.id, createdAt: { gte: week } } }),
       prisma.lead.count({
-        where: { repId: rep.id, acculynxJobId: { not: null }, updatedAt: { gte: week } },
+        where: { repId: rep.id, acculynxJobId: { not: null }, acculynxPushedAt: { gte: week } },
       }),
     ]);
     stats.push({
