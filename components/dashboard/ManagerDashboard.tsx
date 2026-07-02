@@ -29,14 +29,14 @@ export function ManagerDashboard() {
   const { data } = useSWR<DashboardData>(`/api/dashboard/stats?range=${range}`);
   const c = data?.cards;
 
-  // Each card links to the matching list, scoped to the selected range where
-  // the target list supports it.
+  // Terminology: a knocked door is a "door", not a lead. A record only counts
+  // as a "Lead" once it's pushed to AccuLynx. Conversion = Leads ÷ Knocked.
   const cards = [
     { label: "Active Territories", value: c?.activeTerritories, href: "/territories" },
-    { label: "Total Leads", value: c?.totalLeads, href: "/leads" },
+    { label: "Total Doors", value: c?.totalLeads, href: "/leads" },
     { label: "Knocked", value: c?.knocked, href: `/leads?range=${range}` },
+    { label: "Leads", value: c?.acculynx, href: "/leads?acculynx=1" },
     { label: "Appointments", value: c?.appointments, href: `/appointments?range=${range}` },
-    { label: "AccuLynx Leads", value: c?.acculynx, href: "/leads?acculynx=1" },
     { label: "Conversion %", value: c ? `${c.conversionPct}%` : undefined, href: "/leaderboard" },
   ];
 

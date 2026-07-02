@@ -30,8 +30,10 @@ export async function GET(req: Request) {
       prisma.lead.count(),
       prisma.lead.count({ where: dispoWhere }),
       prisma.appointment.count({ where: { scheduledAt: inWindow } }),
-      prisma.lead.count({ where: { acculynxJobId: { not: null }, updatedAt: inWindow } }),
+      // A "Lead" = a door pushed to AccuLynx (by push date).
+      prisma.lead.count({ where: { acculynxJobId: { not: null }, acculynxPushedAt: inWindow } }),
     ]);
+    // Conversion = Leads (AccuLynx) ÷ Knocked.
     const conversionPct = knocked > 0 ? Math.round((acculynx / knocked) * 100) : 0;
 
     // Pipeline + disposition breakdown for leads worked in the window.

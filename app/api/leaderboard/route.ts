@@ -45,7 +45,7 @@ async function compute(start: Date, end: Date, territoryId?: string): Promise<Ro
     const [doors, appts, acculynxLeads] = await Promise.all([
       prisma.lead.count({ where: { ...territoryWhere, repId: rep.id, dispositionAt: { gte: start, lte: end } } }),
       prisma.appointment.count({ where: { repId: rep.id, createdAt: { gte: start, lte: end } } }),
-      prisma.lead.count({ where: { ...territoryWhere, repId: rep.id, acculynxJobId: { not: null }, updatedAt: { gte: start, lte: end } } }),
+      prisma.lead.count({ where: { ...territoryWhere, repId: rep.id, acculynxJobId: { not: null }, acculynxPushedAt: { gte: start, lte: end } } }),
     ]);
     rows.push({
       repId: rep.id, name: rep.name, doors, appointmentsSet: appts, acculynxLeads,
