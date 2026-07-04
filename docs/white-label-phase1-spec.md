@@ -4,8 +4,11 @@ Introduce **Organization** tenancy with airtight data isolation. NSR becomes
 **Org #1** with **zero behavior change**. No branding/billing/signup yet (later
 phases).
 
-> ⚠️ The app is live in production with real reps. This ships via a **staged,
-> expand→backfill→contract rollout**, not a single auto-deployed merge.
+> Built on a **fresh, separate deployment + empty database** (the white-label
+> platform). NSR's live app and DB are **untouched**. So `organizationId` is
+> `NOT NULL` from day one — no in-place migration or live-data backfill. NSR is
+> imported later as a one-time **convergence** step (Phase 6+), done against the
+> platform, never mutating NSR's production.
 
 ---
 
@@ -44,20 +47,21 @@ model Organization {
 
 ---
 
-## 2. Migration strategy (zero-downtime: expand → backfill → contract)
+## 2. Migration strategy (fresh instance — no live-data risk)
 
-1. **Expand** (Migration A): create `Organization`; add `organizationId` as
-   **NULLABLE** with FK + index on every scoped table. Non-breaking — current
-   code ignores the column. Deploy.
-2. **Backfill** (idempotent script): create the "NSR Elite" org; `UPDATE` every
-   scoped table `SET organizationId = <nsr id>` where null. For the singleton
-   settings, attach existing rows to Org #1.
-3. **Enforce** (code deploy): ship the scoping layer + auth org-context (Section
-   3–4). Now every read/write is org-aware; all NSR data is Org #1.
-4. **Contract** (Migration B): after verifying backfill, `ALTER … SET NOT NULL`
-   on `organizationId`.
+The platform is a brand-new deployment with an **empty database**, so there's no
+live data to migrate. Build it multi-tenant from the start:
 
-Each step is a separate deploy, verified before the next.
+- `organizationId` is **`NOT NULL`** on every scoped model from the first
+  migration.
+- The seed creates a **demo Organization + admin** for local/dev/test.
+- Every request runs inside an org context (Sections 3–4), so there's no
+  "unscoped legacy data" to reconcile.
+
+**NSR convergence (later, separate — Phase 6+):** when the platform is proven,
+import NSR's existing data into a new Org — export from NSR's DB, insert under
+the new org id. One-time, planned, run against the *platform* (never mutating
+NSR's production).
 
 ---
 
@@ -150,14 +154,14 @@ Rule: **never trust a bare id lookup.** Replace `findUnique({where:{id}})` with
 
 ---
 
-## 8. Rollout sequence (live-app safe)
-1. Build on branch; add tests.
-2. Deploy **Expand** migration (nullable columns) — no behavior change.
-3. Run **Backfill** → verify counts per table all attributed to Org #1.
-4. Deploy **scoping + auth context** behind confidence of the test suite.
-5. Smoke-test NSR in production (everything still works, nothing missing).
-6. Deploy **Contract** migration (NOT NULL).
-7. Only then begin Phase 2 (branding) and pilot a second org.
+## 8. Rollout sequence (fresh platform)
+1. Fork repo → platform repo; new Vercel project + empty DB.
+2. Build `Organization` + `organizationId` (NOT NULL) + central scoping + auth
+   org-context; seed a demo org.
+3. Get the isolation test suite (Section 7) green — the go-live gate.
+4. Deploy the platform to its own environment; pilot with seeded/test orgs.
+5. **NSR stays on its existing app throughout — untouched.**
+6. Convergence (later): a planned import of NSR as Org #1, if/when chosen.
 
 ## 9. Effort
 X-Large; the largest single chunk of the white-label program. Most of the risk

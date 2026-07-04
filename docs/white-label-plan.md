@@ -14,6 +14,29 @@ organizations inside.
   connection a contractor sets up themselves.
 - Built to **scale as a product**.
 
+## Delivery strategy — build the platform separately; NSR untouched
+- Build the white-label platform as a **new repo + new Vercel project + new
+  database + new (platform-branded) App Store app**. NSR's current app, data,
+  and store listing stay **frozen and untouched** — zero blast radius.
+- The platform is **one multi-tenant app** (many orgs inside), **not** a
+  per-contractor clone.
+- **Convergence (recommended):** once the platform is proven, import NSR onto it
+  as **Org #1** in a single planned migration, then retire the standalone app →
+  one codebase long-term. *(Alternative: keep NSR standalone forever = two
+  codebases to maintain.)*
+- Consequence: Phase 1 builds multi-tenancy on a **fresh, empty database** — no
+  risky in-place migration of live data.
+
+### Standing up the platform (runbook)
+1. **Fork** this repo → new platform repo (e.g. `nsr-platform`).
+2. New **Vercel project** + new **database** (Neon) for it — separate from NSR's.
+3. Copy env config; generate a fresh `NEXTAUTH_SECRET`; point `DATABASE_URL` at
+   the new DB. Central integration keys (ATTOM, skip-trace, SMTP, Mapbox) can be
+   the same platform-owned keys.
+4. Do all Phase 1 work there; seed demo orgs (never connect to NSR's DB).
+5. New **App Store listing** under the platform brand; NSR's listing untouched.
+6. Decide convergence (A) vs. standalone-forever (B) when the platform is proven.
+
 ## Open decisions (need answers to finalize)
 1. **Platform brand.** The store app can't stay "NSR Elite" if NSR is just one
    customer — it needs a neutral **product name + icon** (e.g. "DoorKnocker
