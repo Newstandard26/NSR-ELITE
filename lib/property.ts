@@ -327,13 +327,24 @@ async function batchDataProvider(input: AddressInput): Promise<PropertyEnrichmen
 }
 
 async function fetchFromProvider(input: AddressInput): Promise<PropertyEnrichment> {
-  switch (activeProvider()) {
-    case "batchdata":
-      return batchDataProvider(input);
-    case "attom":
-      return attomProvider(input);
-    default:
-      return mockProvider(input);
+  const provider = activeProvider();
+  try {
+    if (provider === "batchdata") return await batchDataProvider(input);
+    if (provider === "attom") return await attomProvider(input);
+    return mockProvider(input);
+  } catch (e) {
+    // Resilience: if the selected live provider fails (e.g. a bad BatchData
+    // token), fall back to ATTOM so the app keeps working for the team. The
+    // error is logged; a successful fallback record has source "attom".
+    console.error(`Property provider "${provider}" failed:`, (e as Error).message);
+    if (provider !== "attom" && process.env.ATTOM_API_KEY) {
+      try {
+        return await attomProvider(input);
+      } catch (e2) {
+        console.error("ATTOM fallback failed:", (e2 as Error).message);
+      }
+    }
+    throw e;
   }
 }
 
