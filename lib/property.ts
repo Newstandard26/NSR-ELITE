@@ -227,7 +227,9 @@ async function attomProvider(input: AddressInput): Promise<PropertyEnrichment> {
 // verify the exact field mapping against a real response (Settings →
 // Integrations shows the raw payload). Auth = Bearer token.
 async function batchDataProvider(input: AddressInput): Promise<PropertyEnrichment> {
-  const key = process.env.BATCHDATA_API_KEY!;
+  // Tolerate a pasted trailing newline/space or an accidental "Bearer " prefix
+  // in the env value (both cause a 401 "Invalid token").
+  const key = (process.env.BATCHDATA_API_KEY ?? "").trim().replace(/^Bearer\s+/i, "");
   const base = process.env.BATCHDATA_BASE_URL || "https://api.batchdata.com/api/v1";
   const url = `${base}/property/skip-trace`;
 
