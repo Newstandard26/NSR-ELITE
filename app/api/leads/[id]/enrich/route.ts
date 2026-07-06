@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireUser, AuthError } from "@/lib/auth";
 import { handleError, json } from "@/lib/api";
 import { enrichLead, enrichmentEnabled } from "@/lib/property";
 
@@ -16,6 +16,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const record = await enrichLead(params.id, user.name ?? undefined, { force });
     return json({ propertyRecord: record });
   } catch (err) {
-    return handleError(err);
+    // Preserve auth errors; otherwise surface the provider error message so a
+    // failed lookup is diagnosable (e.g. a BatchData HTTP/mapping error) instead
+    // of a generic 500.
+    if (err instanceof AuthError) return handleError(err);
+    console.error("Property enrich failed:", err);
+    return json({ error: `Lookup failed: ${(err as Error).message}` }, 502);
   }
 }

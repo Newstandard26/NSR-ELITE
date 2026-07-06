@@ -251,7 +251,10 @@ async function batchDataProvider(input: AddressInput): Promise<PropertyEnrichmen
       ],
     }),
   });
-  if (!res.ok) throw new Error(`BatchData request failed (HTTP ${res.status})`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`BatchData HTTP ${res.status} at ${url}: ${body.slice(0, 400)}`);
+  }
   const data = await res.json();
 
   // Response shape (defensive): results.persons[0] with name / phoneNumbers /
@@ -271,15 +274,19 @@ async function batchDataProvider(input: AddressInput): Promise<PropertyEnrichmen
   const last = person?.name?.last ?? person?.lastName ?? "";
   const ownerName = person?.name?.full ?? (`${first} ${last}`.trim() || null);
 
-  const phones: PropertyPhone[] = (person?.phoneNumbers ?? person?.phones ?? [])
-    .map((p: Record<string, unknown>) => ({
-      number: String(p.number ?? p.phone ?? ""),
-      type: (p.type as string) ?? undefined,
-      dnc: Boolean(p.dnc ?? p.doNotCall),
-    }))
-    .filter((p: PropertyPhone) => p.number);
-  const emails: string[] = (person?.emails ?? [])
-    .map((e: unknown) => (typeof e === "string" ? e : (e as { email?: string }).email))
+  const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const phones: PropertyPhone[] = asArray(person?.phoneNumbers ?? person?.phones)
+    .map((p) => {
+      const o = (p ?? {}) as Record<string, unknown>;
+      return {
+        number: String(o.number ?? o.phone ?? ""),
+        type: (o.type as string) ?? undefined,
+        dnc: Boolean(o.dnc ?? o.doNotCall),
+      };
+    })
+    .filter((p) => p.number);
+  const emails: string[] = asArray(person?.emails)
+    .map((e) => (typeof e === "string" ? e : (e as { email?: string })?.email))
     .filter(Boolean) as string[];
 
   const value =
