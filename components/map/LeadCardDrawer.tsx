@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import DatePicker from "react-datepicker";
@@ -42,18 +42,8 @@ export function LeadCardDrawer({
   const [cust, setCust] = useState({ firstName: "", lastName: "", address: "", phone: "", email: "" });
   const propertyEnrichEnabled = process.env.NEXT_PUBLIC_PROPERTY_ENRICHMENT_ENABLED === "true";
 
-  // Auto-pull property data the first time a lead is opened (e.g. right after a
-  // pin is dropped or a rooftop is tapped), so the owner name + property info
-  // populate the card without the rep tapping a button. Runs once per lead.
-  const autoEnrichedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!propertyEnrichEnabled || !lead) return;
-    if (lead.enrichedAt || lead.propertyRecord) return; // already enriched
-    if (autoEnrichedRef.current === lead.id) return; // don't re-trigger
-    autoEnrichedRef.current = lead.id;
-    pullPropertyData({ silent: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead?.id, lead?.enrichedAt, lead?.propertyRecord, propertyEnrichEnabled]);
+  // Property lookup is ON DEMAND (the rep taps the button) so we don't pay for a
+  // paid BatchData lookup on every pin drop / rooftop tap.
 
   async function updateDisposition(dispositionStatusId: string) {
     setBusy("disposition");
