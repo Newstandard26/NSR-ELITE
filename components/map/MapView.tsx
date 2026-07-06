@@ -197,19 +197,11 @@ export function MapView() {
           setSelectedLead(lead.id);
         });
 
-        const marker = new mapboxgl.Marker({ element: el, draggable: isManager })
+        // Pins are locked to where they were dropped — never draggable — so a
+        // stray touch while panning can't move a lead's location.
+        const marker = new mapboxgl.Marker({ element: el, draggable: false })
           .setLngLat([lead.lng, lead.lat])
           .addTo(map);
-        if (isManager) {
-          marker.on("dragend", () => {
-            const { lng, lat } = marker.getLngLat();
-            fetch(`/api/leads/${lead.id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ lat, lng }),
-            }).catch(() => {});
-          });
-        }
         markersRef.current.push(marker);
       }
     };
