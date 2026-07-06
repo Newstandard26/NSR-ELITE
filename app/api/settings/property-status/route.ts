@@ -17,31 +17,20 @@ function shape(obj: unknown): unknown {
 }
 
 // GET /api/settings/property-status — admin-only readout of which property-data
-// provider the running server resolves to, plus the most recent ATTOM record's
+// provider the running server resolves to, plus the most recent live record's
 // raw response + a compact "shape" of it for field-mapping. Never returns the key.
 export async function GET() {
   try {
     await requireRole("ADMIN");
-    const latestAttomRecord = await prisma.propertyRecord.findFirst({
-      where: { source: "attom" },
+    const latestRecord = await prisma.propertyRecord.findFirst({
+      where: { source: { in: ["attom", "batchdata"] } },
       orderBy: { fetchedAt: "desc" },
     });
-    const raw = (latestAttomRecord?.raw ?? null) as Record<string, unknown> | null;
-    const rawShape = raw
-      ? {
-          topKeys: Object.keys(raw),
-          summary: shape(raw.summary),
-          building: shape(raw.building),
-          buildingSize: shape((raw.building as Record<string, unknown>)?.size),
-          assessment: shape(raw.assessment),
-          assessmentAssessed: shape((raw.assessment as Record<string, unknown>)?.assessed),
-          assessmentMarket: shape((raw.assessment as Record<string, unknown>)?.market),
-          sale: shape(raw.sale),
-          avm: shape(raw.avm),
-          lot: shape(raw.lot),
-        }
-      : null;
-    return json({ ...providerDiagnostics(), rawShape, latestAttomRecord });
+    const raw = (latestRecord?.raw ?? null) as Record<string, unknown> | null;
+    // Provider-agnostic: top-level keys + one level deep, so it works for ATTOM
+    // and BatchData alike.
+    const rawShape = raw ? { topKeys: Object.keys(raw), oneLevel: shape(raw) } : null;
+    return json({ ...providerDiagnostics(), rawShape, latestRecord });
   } catch (err) {
     return handleError(err);
   }
