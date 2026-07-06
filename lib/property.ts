@@ -369,8 +369,10 @@ export async function enrichLead(leadId: string, actor?: string, opts?: { force?
   const cutoff = new Date(Date.now() - CACHE_TTL_DAYS * 86_400_000);
 
   let record = await prisma.propertyRecord.findUnique({ where: { normalizedAddress: normalized } });
-  // `force` (the Refresh button) re-fetches even if the cache is still fresh.
-  const fresh = !opts?.force && record && record.fetchedAt >= cutoff;
+  // Reuse the cache only if it's recent AND produced by the *current* provider —
+  // otherwise a stale record from a previous provider (e.g. ATTOM) would keep
+  // being served after switching to BatchData. `force` (Refresh) always re-fetches.
+  const fresh = !opts?.force && record != null && record.fetchedAt >= cutoff && record.source === activeProvider();
 
   if (!fresh) {
     const enrichment = await fetchFromProvider(lead);
