@@ -22,7 +22,7 @@ export interface PropertyPhone {
 }
 
 export interface PropertyEnrichment {
-  source: "mock" | "attom";
+  source: "mock" | "attom" | "batchdata";
   ownerName?: string | null;
   ownerOccupied?: boolean | null;
   mailingAddress?: string | null;
@@ -62,24 +62,27 @@ export function enrichmentEnabled(): boolean {
   return process.env.PROPERTY_ENRICHMENT_ENABLED === "true";
 }
 
-function activeProvider(): "mock" | "attom" {
-  return process.env.PROPERTY_DATA_PROVIDER === "attom" && process.env.ATTOM_API_KEY
-    ? "attom"
-    : "mock";
+function activeProvider(): "mock" | "attom" | "batchdata" {
+  const p = process.env.PROPERTY_DATA_PROVIDER;
+  if (p === "batchdata" && process.env.BATCHDATA_API_KEY) return "batchdata";
+  if (p === "attom" && process.env.ATTOM_API_KEY) return "attom";
+  return "mock";
 }
 
 // Admin diagnostic: what the running server actually sees (never exposes the key
 // itself). Reveals redeploy/typo/scope problems behind "still showing mock".
 export function providerDiagnostics() {
   const providerEnv = process.env.PROPERTY_DATA_PROVIDER ?? null;
-  const key = process.env.ATTOM_API_KEY ?? "";
+  const attomKey = process.env.ATTOM_API_KEY ?? "";
+  const batchKey = process.env.BATCHDATA_API_KEY ?? "";
   return {
     activeProvider: activeProvider(),
     enrichmentEnabled: enrichmentEnabled(),
     PROPERTY_DATA_PROVIDER: providerEnv,
-    providerIsExactlyAttom: providerEnv === "attom",
-    ATTOM_API_KEY_present: key.length > 0,
-    ATTOM_API_KEY_length: key.length,
+    ATTOM_API_KEY_present: attomKey.length > 0,
+    ATTOM_API_KEY_length: attomKey.length,
+    BATCHDATA_API_KEY_present: batchKey.length > 0,
+    BATCHDATA_API_KEY_length: batchKey.length,
     PROPERTY_ENRICHMENT_ENABLED: process.env.PROPERTY_ENRICHMENT_ENABLED ?? null,
     NEXT_PUBLIC_PROPERTY_ENRICHMENT_ENABLED:
       process.env.NEXT_PUBLIC_PROPERTY_ENRICHMENT_ENABLED ?? null,
@@ -217,8 +220,112 @@ async function attomProvider(input: AddressInput): Promise<PropertyEnrichment> {
   };
 }
 
+// --- BatchData provider ----------------------------------------------------
+// BatchData (BatchLeads' API) returns property + skip-traced contacts (phones
+// with DNC flags, emails) and demographics in one place — the full customer
+// picture. Implemented from BatchData's documented Property Skip Trace API;
+// verify the exact field mapping against a real response (Settings →
+// Integrations shows the raw payload). Auth = Bearer token.
+async function batchDataProvider(input: AddressInput): Promise<PropertyEnrichment> {
+  const key = process.env.BATCHDATA_API_KEY!;
+  const base = process.env.BATCHDATA_BASE_URL || "https://api.batchdata.com/api/v1";
+  const url = `${base}/property/skip-trace`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({
+      requests: [
+        {
+          propertyAddress: {
+            street: input.address,
+            city: input.city,
+            state: input.state,
+            zip: input.zip,
+          },
+        },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`BatchData request failed (HTTP ${res.status})`);
+  const data = await res.json();
+
+  // Response shape (defensive): results.persons[0] with name / phoneNumbers /
+  // emails, plus an attached property object.
+  const results = data?.results ?? data?.data ?? data;
+  const person =
+    results?.persons?.[0] ?? results?.person ?? results?.[0]?.persons?.[0] ?? null;
+  const prop =
+    results?.property ?? person?.property ?? results?.properties?.[0] ?? results?.[0]?.property ?? {};
+
+  const num = (v: unknown): number | null => {
+    const n = typeof v === "string" ? Number(String(v).replace(/[^0-9.-]/g, "")) : (v as number);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const first = person?.name?.first ?? person?.firstName ?? "";
+  const last = person?.name?.last ?? person?.lastName ?? "";
+  const ownerName = person?.name?.full ?? (`${first} ${last}`.trim() || null);
+
+  const phones: PropertyPhone[] = (person?.phoneNumbers ?? person?.phones ?? [])
+    .map((p: Record<string, unknown>) => ({
+      number: String(p.number ?? p.phone ?? ""),
+      type: (p.type as string) ?? undefined,
+      dnc: Boolean(p.dnc ?? p.doNotCall),
+    }))
+    .filter((p: PropertyPhone) => p.number);
+  const emails: string[] = (person?.emails ?? [])
+    .map((e: unknown) => (typeof e === "string" ? e : (e as { email?: string }).email))
+    .filter(Boolean) as string[];
+
+  const value =
+    num(prop?.valuation?.estimatedValue) ??
+    num(prop?.estimatedValue) ??
+    num(prop?.avm?.value) ??
+    num(prop?.assessment?.marketValue);
+  const mortgage = num(prop?.openLoans?.[0]?.amount) ?? num(prop?.mortgageBalance);
+
+  return {
+    source: "batchdata",
+    ownerName,
+    ownerOccupied:
+      prop?.owner?.ownerOccupied ?? prop?.ownerOccupied ?? (prop?.absenteeOwner === false ? true : null),
+    mailingAddress: prop?.owner?.mailingAddress?.oneLine ?? prop?.mailingAddress ?? null,
+    yearBuilt: num(prop?.building?.yearBuilt) ?? num(prop?.yearBuilt),
+    sqft: num(prop?.building?.livingArea) ?? num(prop?.squareFeet) ?? num(prop?.building?.totalBuildingAreaSquareFeet),
+    beds: num(prop?.building?.bedroomCount) ?? num(prop?.bedrooms),
+    baths: num(prop?.building?.bathroomCount) ?? num(prop?.bathrooms),
+    lotSizeSqft: num(prop?.lot?.lotSizeSquareFeet) ?? num(prop?.lotSquareFeet),
+    lastSalePrice: num(prop?.sale?.lastSale?.price) ?? num(prop?.lastSalePrice),
+    lastSaleDate: prop?.sale?.lastSale?.date ?? prop?.lastSaleDate ?? null,
+    assessedValue: num(prop?.assessment?.assessedValue),
+    avmValue: value,
+    avmLow: num(prop?.valuation?.estimatedValueLow),
+    avmHigh: num(prop?.valuation?.estimatedValueHigh),
+    estimatedEquity:
+      num(prop?.valuation?.equityCurrentEstimatedBalance) ??
+      (value != null && mortgage != null ? Math.max(0, value - mortgage) : null),
+    mortgageBalanceEst: mortgage,
+    estimatedIncomeBand: person?.demographics?.incomeRange ?? person?.income ?? null,
+    phones,
+    emails,
+    raw: data,
+  };
+}
+
 async function fetchFromProvider(input: AddressInput): Promise<PropertyEnrichment> {
-  return activeProvider() === "attom" ? attomProvider(input) : mockProvider(input);
+  switch (activeProvider()) {
+    case "batchdata":
+      return batchDataProvider(input);
+    case "attom":
+      return attomProvider(input);
+    default:
+      return mockProvider(input);
+  }
 }
 
 // --- Orchestration ---------------------------------------------------------
