@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, RefreshCw, Building2, Phone, Mail } from "lucide-react";
+import { Home, RefreshCw, Building2, Phone, Mail, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PropertyRecordDTO } from "@/lib/types";
 
@@ -35,15 +35,15 @@ export function PropertyDataPanel({
         </div>
         {busy ? (
           <p className="flex items-center gap-2 text-sm text-zinc-400">
-            <RefreshCw className="h-4 w-4 animate-spin" /> Looking up owner &amp; property…
+            <RefreshCw className="h-4 w-4 animate-spin" /> Looking up owner &amp; contact…
           </p>
         ) : (
           <>
             <p className="mb-2 text-xs text-zinc-500">
-              Pull owner, value, equity and contact info for this address.
+              Get the owner, value, equity, and contact info (phone &amp; email) for this address.
             </p>
             <Button className="w-full" onClick={onPull}>
-              Pull property data
+              <Search className="h-4 w-4" /> Look up property &amp; contact
             </Button>
           </>
         )}
